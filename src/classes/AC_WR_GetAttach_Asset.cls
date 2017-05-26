@@ -67,14 +67,20 @@ public with sharing class AC_WR_GetAttach_Asset {
         string strUsername = UserInfo.getUserName();
         List<user> activeId = [select Id, AccountId,UserType,IsPortalEnabled,ContactId,Contact.NJC_CPJournal_RM__c,LastName,FirstName
                                             from User where Username = : strUsername limit 1];
-        String strAccountid = '';
-        String strContactId = '';
-        String strIdofUser = '';
+        List<id> ListAccountid = new List<Id>();
         Journal_RM = 'display:none;';
         if (activeId.size() == 0) return;
-        strIdofUser = activeId[0].Id;
-        strAccountid = activeId[0].AccountId;
-        strContactId = activeId[0].ContactId;
+        //strAccountid = activeId[0].AccountId;
+        // 2017/05/26 add start yoshida
+        string strAccountid = activeId[0].AccountId;
+        ListAccountid.add(strAccountid);
+        // 親に設定した取引先が存在する場合は取得
+        ListAccountid.add(strAccountid);
+        List<Account> listAccChild = [select id from account where RepresentationCustomer__c = : strAccountid];
+        for(Account acc : listAccChild){
+            ListAccountid.add(acc.id);
+        }
+        // 2017/05/26 add end yoshida
         if(activeId[0].Contact.NJC_CPJournal_RM__c) Journal_RM = 'display: inline-block;';
         
         integer intCount = 0;
@@ -88,7 +94,7 @@ public with sharing class AC_WR_GetAttach_Asset {
                                                         ,As_IRH_WorkerRf__c
                                                         ,As_IRH_Biko__c
                                                     from As_InstallationReportHed__c
-                                                   where As_IRH_ContractDestination__c = : strAccountid 
+                                                   where As_IRH_ContractDestination__c = : ListAccountid 
                                                         order by CreatedDate desc];
         for(As_InstallationReportHed__c Uke : lstUke){
             UkeIds.add(Uke.Id);
