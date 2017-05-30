@@ -50,7 +50,7 @@ public with sharing class AC_WR_GetAttach_Asset {
     public integer intPage { get; set; }
     // 最終ページ
     public Integer LastPage { get; set; }
-    // 最大表示行数
+    // 最大 表示行数
     public integer intMax { get; set; }
     // 取得データ
     public List<WRAtt> ALLAtts { get; set; }
@@ -63,7 +63,7 @@ public with sharing class AC_WR_GetAttach_Asset {
         intMax = 5;
         ALLAtts = new List<WRAtt>();
 
-        // ログインユーザの取引先責任者を取得
+        // ログインユーザの取引先責任者を取得 
         string strUsername = UserInfo.getUserName();
         List<user> activeId = [select Id, AccountId,UserType,IsPortalEnabled,ContactId,Contact.NJC_CPJournal_RM__c,LastName,FirstName
                                             from User where Username = : strUsername limit 1];
