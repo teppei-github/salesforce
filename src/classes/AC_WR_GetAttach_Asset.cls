@@ -4,7 +4,7 @@ public with sharing class AC_WR_GetAttach_Asset {
     public Map<integer,WRAtt> ALLAttMap = new Map<integer,WRAtt>();
     public String Journal_RM { get; set; }
     
-    // 画面表示クラス
+    // 画面表示 クラス
     public class WRAtt {
         // 行番号
         public Integer lineNo { get; set; }

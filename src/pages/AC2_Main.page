@@ -1,0 +1,2023 @@
+<!--
+【仕様】
+・with受注データより取得
+・ヘッダの情報はＣ設置報告書ヘッダー（As_InstallationReportHed__c）へ更新
+・明細の情報はＣ設置報告書明細（As_InstallationReportSpe__c）へ更新
+・グループヘッダの作業明細は作業チェック項目（AC2_WorkCheckItem__c）へ更新
+・最終的な採取情報は納入商品に連携
+-->
+
+<apex:page id="pageid" standardController="Account" extensions="AC2_Main_Ctrl" showHeader="false" standardStylesheets="false" sidebar="false" applyHtmlTag="false" applyBodyTag="false" docType="html-5.0">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"> 
+        <head>
+            <title>With納入商品連携</title>
+            <meta charset="utf-8" />
+            <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="description" content="" /> 
+            <meta name="keywords" content="" />
+            <meta name="author" content="NJCs" />
+            <!-- Lightning Design System -->
+            <apex:stylesheet value="{!URLFOR($Resource.SLDS0202, 'assets/styles/salesforce-lightning-design-system.min.css')}" />
+            <apex:includeScript value="//code.jquery.com/jquery-1.12.3.js" />
+            <apex:includeScript value="//code.jquery.com/ui/1.12.1/jquery-ui.min.js" />
+            <apex:includeScript value="//cdnjs.cloudflare.com/ajax/libs/mustache.js/2.2.1/mustache.js"/>
+            <apex:includeScript value="/soap/ajax/25.0/connection.js"/>
+            <apex:includeScript value="/soap/ajax/25.0/apex.js"/>
+            <apex:includeScript value="{!URLFOR($Resource.JSZip)}"/>
+            <apex:includeScript value="{!URLFOR($Resource.FileSaver)}"/>
+            <!-- IE11でSVG表示 -->
+            <apex:includeScript value="https://cdnjs.cloudflare.com/ajax/libs/svg4everybody/2.0.3/svg4everybody.js"/>
+            <script>
+            $j = jQuery.noConflict();
+            
+            //起動時制御
+            $j(document).ready(function(){
+                //[タップして表示]制御
+                $j(".submenu").css("display","none");
+                $j(".trigger").click(function(){
+                    if($j("+.submenu",this).css("display")=="none"){
+                        $j(this).addClass("active-submenu");
+                        $j(this).removeClass("none-submenu");
+                        $j("+ .submenu",this).slideDown("normal");
+                    }else{
+                        $j(this).removeClass("active-submenu");
+                        $j(this).addClass("none-submenu");
+                        $j("+.submenu",this).slideUp("normal");
+                    }
+                });
+                
+                if('{!Repid}' == ''){
+                    // spinner 表示
+                    //showloadingspinner();
+                    // 日付初期値設定
+                    $j('[id$=inptDateFId]').val('{!selectedDateFrom}');
+                    $j('[id$=inptDateTId]').val('{!selectedDateTo}');
+                    
+                    // 項番開始終了初期値設定
+                    $j('[id$=inputItemFr]').val('000');
+                    $j('[id$=inputItemTo]').val('999');
+                }
+                else{
+                    $j('[id$=HeadOrderNoSearchTxt]').attr('disabled','disabled');
+                    $j('[id$=HeadOrderNoSearchSvg]').removeAttr('onclick');
+                    $j('[id$=inputItemFr]').attr('disabled','disabled');
+                    $j('[id$=inputItemTo]').attr('disabled','disabled');
+                    $j('[id$=orderReadButton]').attr('disabled','disabled');
+                }
+                
+                // 受注伝票番号が入力されたときの制御
+                var OrderNumber;
+                $j('[id$=HeadOrderNoSearchTxt]')
+                .focusin(function(e) {
+                    OrderNumber = $j('[id$=HeadOrderNoSearchTxt]').val();
+                })
+                .focusout(function(e) {
+                    if(OrderNumber != $j('[id$=HeadOrderNoSearchTxt]').val()){
+                        // 伝票番号変更時の動作
+                        GetDenpyoValidData();
+                    }
+                });
+                
+                // エンター無効
+                //$j('[id$=mainFormId]')
+                $j('[id$=HeadOrderNoSearchTxt]')
+                .keypress(function(ev) {
+                    if ((ev.which && ev.which === 13) || (ev.keyCode && ev.keyCode === 13)) {
+                        return false;
+                    } else {
+                        return true;
+                    }
+                });
+                
+                $j('#orderSearchAcc').val('{!acccode}');
+            });
+            
+            function GetDenpyoValidData(){
+                // 伝票番号から取引先を取得
+                var torihikisakicd;
+                var orderno = $j('[id$=HeadOrderNoSearchTxt]').val();
+                if(orderno == '') return;
+                // 伝票番号から取得する場合は常に未完了を対象とする
+                $j.get("https://asweb.njc.co.jp/withapi/SARECO", { RORNU: orderno , KANRYOCHK: "FALSE" },
+                   function(dataH){
+                       var FindFlg = false;
+                       $j(dataH.datas).each(function(){
+                           if(orderno == this.RORNU){
+                               FindFlg = true;
+                               var picnm = this.PICNM;
+                               try{
+                                   if(picnm.indexOf(':') > 0){
+                                       var s = picnm.split(':');
+                                       picnm = s[0];
+                                   }
+                                   else{
+                                       picnm = this.PICNM;
+                                   }
+                               }
+                               catch(e){
+                                   alert(e.message);
+                               }
+                               DetailSelect(true
+                                            ,this.RORNU
+                                            ,this.ESTNU + '-' + this.ESTBRANU + '-' + this.ESTCBNNU
+                                            ,this.REPPDNNM
+                                            ,''
+                                            ,this.REPDTNCD
+                                            ,this.REPDTNNM
+                                            ,'000'
+                                            ,'999'
+                                            ,''
+                                            ,this.ADDRK
+                                            ,this.TELNU
+                                            ,''
+                                            ,picnm 
+                                            ,this.RORPICNM
+                                            ,this.POSNM
+                                            ,this.SALAPRDE 
+                                           );
+                               return false;
+                           }
+                       });
+                       if(FindFlg == false){
+                           alert('該当の受注ナンバーは存在しません。');
+                       }
+                   }
+                  );
+            }
+            
+            function orderSelectDisp(){
+                // 待機
+                showloadingspinner();
+                
+                //var rornu
+                var acccode = $j('#orderSearchAcc').val(); // 取引先コード
+                var salscodefr = $j('#orderSearchDateFr').val(); // 取引先コード
+                var salscodeto = $j('#orderSearchDateTo').val(); // 取引先コード
+                var csmcstnm = $j('#orderSearchName').val(); // 取引先コード
+                var telnu = $j('#orderSearchTel').val(); // 電話番号
+                var kanryochk = 'FALSE';
+                if($j('#orderSearchUrichk').prop('checked')) kanryochk = 'TRUE'; // 売上済取得フラグ
+                
+                // 取引先に紐づく受注情報を取得（jsonの取得ロジックに入れ替え）
+                var OrderLists = [];
+                try{
+                    $j.get("https://asweb.njc.co.jp/withapi/SARECO", { CSMCSTCD: acccode, SALSCDDEFR : salscodefr, SALSCDDETO : salscodeto, CSMCSTNM : csmcstnm, TELNU : telnu, KANRYOCHK: kanryochk},
+                           function(data){
+                               $j(data.datas).each(function(){
+                                   var sJson = '{';
+                                   sJson += '"ord_No" : "' + this.RORNU + '",'; // 受注№
+                                   sJson += '"ord_EstimateNo" : "' + this.ESTNU + '-' + this.ESTBRANU + '-' + this.ESTCBNNU + '",'; // 見積№
+                                   sJson += '"ord_ExamItemNm" : "' + this.REPPDNNM + '",'; // 代表品名
+                                   sJson += '"ord_Remark" : "' + this.REMRK + '",'; // 備考
+                                   sJson += '"ord_NonyuCd" : "' + this.REPDTNCD + '",'; // 納入先コード
+                                   sJson += '"ord_NonyuNm" : "' + this.REPDTNNM + '",'; // 納入先名
+                                   sJson += '"ord_MinKouNo" : "' + this.CTRTBNNU + '",'; // 最小項番
+                                   sJson += '"ord_MaxKouNo" : "' +this.AGGCBNNU+ '",'; // 最大項番 
+                                   sJson += '"ord_MinDate" : "' + this.APPDE + '",'; // 最小作業日
+                                   sJson += '"ord_MaxDate" : "' +this.CTRDE+ '",'; // 最大作業日
+                                   sJson += '"ord_Zipcd" : "' + '",'; // 郵便番号 ★取得すること！
+                                   sJson += '"ord_Adres" : "' + this.ADDRK + '",'; // 住所
+                                   sJson += '"ord_Tel" : "' + this.TELNU + '",'; // 電話番号
+                                   sJson += '"ord_orgNm" : "' +  '",'; // 顧客担当所属
+                                   sJson += '"ord_dispOrgNm" : "' + this.CNGPOSNM + '",'; // 表示用部門
+                                   
+                                   var picnm = this.PICNM;
+                                   try{
+                                       if(picnm.indexOf(':') > 0){
+                                           var s = picnm.split(':');
+                                           picnm = s[0];
+                                       }
+                                       else{
+                                           picnm = this.PICNM;
+                                       }
+                                   }
+                                   catch(e){
+                                       alert('受注読込エラー：' + e.message);
+                                   }
+                                   sJson += '"ord_StaffNm" : "' + picnm  + '",'; // 顧客担当者
+                                   sJson += '"ord_GroupNm" : "' + this.RORPICNM + '",'; // 営業担当所属(CNGPOSNM)
+                                   var uriyoymd = this.SALSCDDE + '';
+                                   if(uriyoymd == '0') uriyoymd = '';
+                                   console.log('uriyoymd.length:' + uriyoymd.length);
+                                   if(uriyoymd.length == 8){
+                                       uriyoymd = uriyoymd.slice(0,4) + '/' + uriyoymd.slice(4,6)+ '/' + uriyoymd.slice(6,8);
+                                   }
+                                   sJson += '"ord_UriyoYmd" : "' + uriyoymd + '",'; // 売上予定日
+                                   sJson += '"ord_UriageYmd" : "' + this.SALAPRDE + '",'; // 売上日
+                                   sJson += '"ord_PersonNm" : "' + this.POSNM + '"'; // 営業担当者
+                                   sJson += '}';
+                                   OrderLists.push(sJson);
+                               });
+                               var strJson = OrderLists.join(',');
+                               orderProcessDataAF('[' + strJson + ']');
+                           }).fail(function() {
+                        alert('受注データを取得できません。'); // or whatever
+                        closeloadingspinner();
+                        return;
+                    });
+                }
+                catch(e){
+                    alert(e.message);
+                    closeloadingspinner();
+                    return;
+                }
+            }
+            
+            // 受注ダイアログの表示
+            function showOrderSearchDialog() {
+                $j('#orderDialog').slideDown('slow');
+            }
+            
+            // 受注ダイアログのClose
+            function closeOrderDialog() {
+                $j('#orderDialog').hide();
+            }
+            
+            // 受注№選択後の動作
+            function DetailSelect(getDtlFlg, ord_No , ord_EstimateNo, ord_ExamItemNm, ord_Remark, ord_NonyuCd, ord_NonyuNm, ord_MinKouNo, ord_MaxKouNo, ord_Zipcd, ord_Adres, ord_Tel, ord_orgNm, ord_StaffNm, ord_GroupNm, ord_PersonNm, ord_UriageYmd){
+                
+                // ヘッダ情報の登録
+                $j('[id$=HeadOrderNoSearchTxt]').val(ord_No);
+                $j('[id$=headEstimate]').html(ord_EstimateNo);  // outputtext
+                $j('[id$=headEstimateHdn]').val(ord_EstimateNo);  //inputhidden
+                $j('[id$=headExamItemNm]').html(ord_ExamItemNm);
+                $j('[id$=headExamItemNm]').val(ord_ExamItemNm);
+                $j('[id$=headNonyuCd]').html(ord_NonyuCd);
+                $j('[id$=headNonyuCdHdn]').val(ord_NonyuCd);
+                $j('[id$=headNonyuNm]').html(ord_NonyuNm);
+                $j('[id$=headNonyuNmHdn]').val(ord_NonyuNm);
+                $j('[id$=headTel]').val(ord_Tel);
+                $j('[id$=headAdres]').val(ord_Adres);
+                $j('[id$=headorgNm]').val(ord_orgNm);
+                $j('[id$=headStaffNm]').val(ord_StaffNm);
+                $j('[id$=headGroupNm]').html(ord_GroupNm);
+                $j('[id$=headGroupNmHdn]').val(ord_GroupNm);
+                $j('[id$=headPersonNm]').html(ord_PersonNm);
+                $j('[id$=headPersonNmHdn]').val(ord_PersonNm);
+                //$j('[id$=headRemarks]').val(ord_Remark);
+                $j('[id$=inputItemFr]').val('000');
+                $j('[id$=inputItemTo]').val('999');
+                
+                var isKanryoChk = '';
+                if(ord_UriageYmd == '0') isKanryoChk = 'FALSE';
+                if(ord_UriageYmd != '0') isKanryoChk = 'TRUE';
+                //受注№決定時、明細取得も同時に行う
+                if(getDtlFlg) setDetail(isKanryoChk);
+            }
+            
+            // 明細取得ロジック
+            function setDetail(kanryoChk){
+                if(!SearchCheckHead()){
+                    return false;
+                }
+                // spinner 表示
+                showloadingspinner();
+                
+                // 受注№から明細データを取得する（受注№、項番範囲をキーに明細データを取得）
+                var strRORNU = $j('[id$=HeadOrderNoSearchTxt]').val();
+                var strEROARNNUFR = $j('[id$=inputItemFr]').val();
+                var strEROARNNUTO = $j('[id$=inputItemTo]').val();
+                
+                // kanryoChk : TRUE FALSE あるいは空白を設定
+                var DetailLists = [];
+                try{
+                    var jqxhr = $j.get( "https://asweb.njc.co.jp/withapi/SARECD",
+                                       { RORNU: strRORNU , EROARNNUFR: strEROARNNUFR , EROARNNUTO: strEROARNNUTO , KANRYOCHK: kanryoChk }, function() {
+                                       })
+                    .done(function(data ) {
+                        $j(data.datas).each(function(){
+                            var sJson = '{';
+                            sJson += '"dtl_Check" : "true" ,'; // チェック
+                            sJson += '"dtl_RowNo" : "' + this.RORPCRNU + '",'; // 行
+                            sJson += '"dtl_Patern" : "001",'; // 
+                            
+                            //this.PDSCCD によって区分を判定(装置,部品,サービス,ソフトウェア,その他)
+                            var PdsKbn = 'その他';
+                            var PdsChkStr = 'チェック';
+                            var PdsChk = false;
+                            var PDSCCD1,PDSCCD2,PDSCCD3 = '';
+                            if(this.PDSCCD.length >= 9){
+                                var PDSCCD1 = this.PDSCCD.substr(0,3);
+                                var PDSCCD2 = this.PDSCCD.substr(3,3);
+                                var PDSCCD3 = this.PDSCCD.substr(6,3);
+                                
+                                if(PDSCCD1 == '030' || PDSCCD1 == '050' || PDSCCD1 == '060'){
+                                    PdsKbn = 'サービス';
+                                    PdsChkStr = '数量入力';
+                                    PdsChk = true;
+                                }
+                                else if(PDSCCD1 == '020'){
+                                    PdsKbn = 'ソフトウェア';
+                                    PdsChkStr = '数量入力';
+                                    PdsChk = true;
+                                }
+                                    else if((PDSCCD1 == '040' && PDSCCD3 != '060') || (PDSCCD1 == '010' && PDSCCD3 == '700')){
+                                        PdsKbn = '作業';
+                                    }
+                                        else if(PDSCCD1 == '010' && (PDSCCD3 == '100' || PDSCCD3 == '200' || PDSCCD3 == '250' || PDSCCD3 == '300' || PDSCCD3 == '500' || PDSCCD3 == '600')){
+                                            PdsKbn = '装置';
+                                            PdsChkStr = '数量入力';
+                                            PdsChk = true;
+                                        }
+                                            else if(PDSCCD1 == '010' && (PDSCCD3 == '400' || PDSCCD3 == '500' || PDSCCD3 == '600' || PDSCCD3 == '810' || PDSCCD3 == '850' || PDSCCD3 == '880' || PDSCCD3 == '890')){
+                                                PdsKbn = '部品';
+                                                PdsChkStr = '数量入力';
+                                                PdsChk = true;
+                                            }
+                            }
+                            
+                            sJson += '"dtl_Kbn" : "' + PdsKbn + '",'; // 
+                            sJson += '"dtl_Kataban" : "' + this.PDTCD + '",'; // 
+                            sJson += '"dtl_SouchinyuNm" : "' + this.PDTNM + '",'; // 
+                            sJson += '"dtl_Tani" : "' + this.RORUNTNM + '",'; // 
+                            sJson += '"dtl_Suryo" : "' + this.RORQT + '",'; // 
+                            sJson += '"dtl_Biko" : "",'; //  this.RMKRK '
+                            sJson += '"dtl_Pdsccd" : "' + this.PDSCCD + '",'; //
+                            sJson += '"dtl_InpKbnStr" : "' + PdsChkStr + '",'; //
+                            sJson += '"dtl_InpKbn" : ' + PdsChk + ''; //
+                            sJson += '}';
+                            DetailLists.push(sJson);
+                        });
+                        var strJson = DetailLists.join(',');
+                        detailProcessDataAF('[' + strJson + ']');
+                    })
+                    .fail(function() {
+                        alert('受注データを取得できません'); // or whatever
+                        closeloadingspinner();
+                    });
+                }
+                catch(e){
+                    alert(e.message);
+                    closeloadingspinner();
+                    return false;
+                }
+                return true;
+            }
+            
+            function DetailDispAfter(){
+                $j('#DetailTableCon').sortable();
+                
+                // 1行目のグループはmarkを何も表示させない
+                var tr = $j("#DetailTableCon tr");
+                if(tr.length > 0){
+                    var cells = tr.eq(0).children('#detailMark').children('div').hide();//
+                }
+                $j('[id$=headWorkSelect]').attr('readonly',true);  
+                
+                closeloadingspinner();
+            }
+            
+            function workDownloadJS(){
+                //
+                if(window.confirm('保存されたデータを元に作業チェックツールをダウンロードします。\r\nダウンロードを開始してよろしいですか？')){
+                    // spinner 表示
+                    showloadingspinner();
+                    workDownloadAF();
+                }
+            }
+            
+            // 受注明細検索チェック
+            function SearchCheckHead() {
+                if ($j('[id$=HeadOrderNoSearchTxt]').val() == ''){
+                    alert('受注№が指定されていません。');
+                    return false;
+                }
+                if ( $j('[id$=inputItemFr]').val() == ''){
+                    alert('項番(開始)が指定されていません。');
+                    return false;
+                }
+                if ( $j('[id$=inputItemTo]').val() == ''){
+                    alert('項番(終了)が指定されていません。');
+                    return false;
+                }
+                return true;
+            }
+            
+            // 作業内容検索ダイアログの表示
+            var objWorkSelect;
+            function showWork(obj) {
+                try{
+                objWorkSelect = $j(obj).prev('input');
+                var WorkSelectName = objWorkSelect.val();
+                WorkSearchDialogDispAF(WorkSelectName ,'','');
+                }
+                catch(e){alert(e);}
+            }
+            
+            function showWorkSearchDialog() {  
+                try{
+                    var result = $j('#workDialog').is(':visible');
+                    if(result == false){
+                        $j('[id$=WorkSelectContext]').val('user');
+                        $j('[id$=WorkSearchText]').val('');
+                        $j('[id$=WorkSearchText]').prop('disabled',true);
+                        $j('#workDialog').slideDown('slow');
+                    }
+                }
+                catch(e){
+                    alert (e);
+                }
+            }
+            
+            // 作業内容検索ダイアログのClose
+            function closeWorkDialog() {
+            
+                // 編集前の状態に戻す
+                $j('#WorkTableCon').sortable(false);
+                $j('[id$=onofwk]').prop('disabled',true);
+                $j('[id$=inputWork_Title]').prop('disabled',true);
+                $j('[id$=radioWork_Bunrui]').prop('disabled',true);
+                $j('#imgModify').show();
+                $j('[id$=inputSelectName]').hide();
+                $j('#workDialog').hide();
+            }
+            
+            // 作業内容確定時
+            function chkWorkSelectDialog() {
+                var WorkSaveName = $j('[id$=inputSelectName]').val();
+                var WorkSelectName = $j('[id$=WorkCheckNameSelect]').val();
+                // 編集ボタンが押下されている場合
+                if($j('#imgModify').css("display")=="none"){
+                    //もし、編集不可項目 かつ　リスト名称とsave名称が同一であればメッセージ表示
+                    if($j('[id$=WorkDeletebleFlg]').val() == "false" && $j('[id$=inputSelectName]').val() == $j('[id$=WorkCheckNameSelect]').val()){
+                        alert('標準作業項目、また自身が所有者でない作業項目は変更できません。\r\n下部の名称を変更して登録してください。');
+                        return;
+                    }
+                    // save名が空白はアウト
+                    if(WorkSaveName == ''){
+                        alert('保存する名称に空白は指定できません。');    
+                        return;
+                    }
+                    
+                    // 桁数チェック
+                    if(WorkSaveName.length > 80){
+                        alert('保存する名称の桁数が不正です。80桁以下');
+                        return false;
+                    }
+                    var trChk = $j("#WorkCheckTable #workTr");
+                    for( var i=0,l=trChk.length;i<l;i++ ){
+                        var title = trChk.eq(i).children('#tdWorkTitle').children('[id$=inputWork_Title]').val();
+                        if(title.length > 50){
+                            alert('項目の桁数が不正です。50桁以下');
+                            return false;
+                        }
+                    }
+                    
+                    // 名称チェック
+                    {!$RemoteAction.AC2_Main_Ctrl.WorkNameCheck}(WorkSelectName ,WorkSaveName , function(result, event){
+                        if(event.status) {
+                            if(result.length > 0){
+                                alert(result);
+                                return;
+                            }
+                            else{
+                                var WorkLists = [];
+                                var tr = $j("#WorkCheckTable #workTr");//テーブルの全行を取得   
+                                try{             
+                                    for( var i=0,l=tr.length;i<l;i++ ){
+                                        var wkJson = '';
+                                        var kbn = false;
+                                        if(tr.eq(i).children('#tdWorkTitle').prop('colspan') == '2'){
+                                            kbn = true;
+                                        }
+                                        var title = tr.eq(i).children('#tdWorkTitle').children('[id$=inputWork_Title]').val();
+                                        var bunrui = '';
+                                        if(kbn == false){
+                                            var workHtml = tr.eq(i).children('#tdWorkBunrui').children('fieldset').children('table').children('tbody').children('tr').children('td');
+                                            if(workHtml.children('input[value="チェックボックス"]').prop('checked')){
+                                                bunrui = 'チェックボックス';
+                                            }
+                                            else if(workHtml.children('input[value="テキスト"]').prop('checked')){
+                                                bunrui = 'テキスト';
+                                            }
+                                                else {
+                                                    bunrui = '使用しない';
+                                                }
+                                        }
+                                        wkJson += '{"work_Kbn" : ' + kbn;
+                                        wkJson += ' , "work_Title" : "' + title + '"';
+                                        wkJson += ' , "work_Bunrui" : "' + bunrui  + '"';
+                                        wkJson += '}';
+                                        WorkLists.push(wkJson);                     
+                                    }
+                                }
+                                catch(e){
+                                    alert(e.message);
+                                }
+                                var WorkJson = '[' +  WorkLists.join(',') + ']';
+                                
+                                //編集内容の保存 
+                                WorkSaveAF(WorkSaveName,WorkSelectName,WorkJson);
+                                closeWorkSelectDialog();
+                            }
+                        }
+                    });
+                }
+                else{
+                    closeWorkSelectDialog();
+                }
+            }
+            
+            // 削除ボタン押下時
+            function DeleteWorkDialog(){
+                 //もし、編集不可項目 かつ　リスト名称とsave名称が同一であればメッセージ表示
+                if($j('[id$=WorkDeletebleFlg]').val() == "false"){
+                    alert('標準作業項目、また自身が所有者でない作業項目は削除できません。');
+                    return false;
+                }
+                // 名称チェック
+                var WorkSelectName = $j('[id$=WorkCheckNameSelect]').val();
+                {!$RemoteAction.AC2_Main_Ctrl.WorkDeleteCheck}(WorkSelectName, function(result, event){
+                    if(event.status) {
+                        if(result.length > 0){
+                            alert(result);
+                            return false;
+                        }
+                        else{
+                            if(window.confirm('作業チェック「' + WorkSelectName + '」を削除してよろしいですか？')){
+                                {!$RemoteAction.AC2_Main_Ctrl.WorkDelete}(WorkSelectName, function(result, event){
+                                    if(event.status) {
+                                        if(result.length > 0){
+                                            alert(result);
+                                            return false;
+                                        }
+                                        else{
+                                            alert('削除しました。');
+                                            closeWorkDialog();
+                                            return true;
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                });
+                return false;
+            }
+            
+            function closeWorkSelectDialog() {
+                // 編集前の状態に戻す
+                $j('#WorkTableCon').sortable(false);
+                $j('[id$=onofwk]').prop('disabled',true);
+                $j('[id$=inputWork_Title]').prop('disabled',true);
+                $j('[id$=radioWork_Bunrui]').prop('disabled',true);
+                $j('#imgModify').show();
+                $j('[id$=inputSelectName]').hide();
+                //
+                var selectVal = $j('[id$=inputSelectName]').val();
+                $j('#workDialog').hide();
+                $j(objWorkSelect).val(selectVal);
+            }
+            
+            // 画面クリア
+            function onClear(){
+                return true;
+            }
+            // 読込中アニメーション表示
+            function showloadingspinner(){
+                $j('[id$=loadingspinner]').css('display', '');
+                return false;
+            }
+            
+            function closeloadingspinner(){
+                $j('[id$=loadingspinner]').css('display', 'none');
+                return false;
+            }
+            
+            // 行追加制御
+            function addList(obj) {
+                try{
+                    //まずはバルーンを非表示
+                    $j(obj).next('p').hide();
+                    var tr = $j(obj).parent().parent().parent();
+                    var trCopy = $j(tr).clone().insertAfter(tr);
+                    // 
+                    var kbnDtId = trCopy.children('#dtl_DtKbnCheck').children('.onofdt').children('input').attr('id');
+                    var kbnGpId = trCopy.children('#dtl_GpKbnCheck').children('.onofgp').children('input').attr('id');
+                    // 現在時刻の分と秒を取得し、IDに反映させる（前行とスイッチが連動してしまう現象を修正）
+                    var dt = new Date();
+                    var mimSecDt = '' + dt.getMinutes() + dt.getSeconds() + '.onofdt';
+                    var mimSecGp = '' + dt.getMinutes() + dt.getSeconds() + '.onofgp';
+                    kbnDtId = kbnDtId.replace('onofdt',mimSecDt);
+                    kbnGpId = kbnGpId.replace('onofgp',mimSecGp);
+                    trCopy.children('#dtl_DtKbnCheck').children('.onofdt').children('input').attr('id', kbnDtId);
+                    trCopy.children('#dtl_DtKbnCheck').children('.onofdt').children('label').attr('for', kbnDtId);
+                    trCopy.children('#dtl_GpKbnCheck').children('.onofgp').children('input').attr('id', kbnGpId);
+                    trCopy.children('#dtl_GpKbnCheck').children('.onofgp').children('label').attr('for', kbnGpId);
+                    
+                }
+                catch(e){
+                    alert(e.message);
+                }
+            }
+            
+            // グループ追加制御
+            function addGroup(obj,hidnObj) {
+                try{
+                    //まずはバルーンを非表示
+                    $j(obj).next('p').hide();
+                    var tr = $j(obj).parent().parent().parent();
+                    // 商品体系を取得
+                    var strPdsccd = tr.children('#dtl_SouchinyuNm').children('[id$=inputPdsccd]').val();
+                    $j(tr).clone().insertAfter(tr);
+                    $j(tr).children('[id*=dtl_SouchinyuNm]').css("display","none");
+                    $j(tr).children('[id*=dtl_Kataban]').css("display","none");
+                    $j(tr).children('[id*=dtl_Suryo]').css("display","none");
+                    $j(tr).children('[id*=dtl_Kbn]').css("display","none");
+                    $j(tr).children('[id*=dtl_Biko]').css("display","none");
+                    $j(tr).children('[id*=dtl_Check]').css("display","none");
+                    $j(tr).children('[id*=dtl_DtKbnCheck]').css("display","none");
+                    $j(tr).children('[id*=dtl_GpKbnCheck]').css("display","");
+                    var td = $j(obj).parent();
+                    $j(td).children('.slds-icon-action-join-group').css("display","none");
+                    $j(td).children('.slds-icon-action-new').css("display","none");
+                    if(strPdsccd.slice(0,9) == '010100100' || strPdsccd.slice(0,9) == '010100200'){
+                        tr.children('#dtl_GpKbnCheck').children('.onofgp').children('input').prop('checked',true);
+                    }
+                    else if(strPdsccd.slice(0,12) == '010100300310' || strPdsccd.slice(0,12) == '010100300315'){
+                        tr.children('#dtl_GpKbnCheck').children('.onofgp').children('input').prop('checked',true);
+                    } 
+                        else{
+                            tr.children('#dtl_GpKbnCheck').children('.onofgp').children('input').prop('checked',false);
+                        }
+                    
+                    //グループのみ表示
+                    $j(tr).children('[id*=dtl_Grpdsp]').css("display","");
+                    $j(tr).children('[id*=dtl_Sagyo]').css("display","");
+                    
+                    //スイッチのID変更
+                    var kbnGpId = tr.children('#dtl_GpKbnCheck').children('.onofgp').children('input').attr('id');
+                    var dt = new Date();
+                    var mimSecGp = '' + dt.getMinutes() + dt.getSeconds() + '.onofgp';
+                    kbnGpId = kbnGpId.replace('onofgp', mimSecGp);
+                    tr.children('#dtl_GpKbnCheck').children('.onofgp').children('input').attr('id', kbnGpId);
+                    tr.children('#dtl_GpKbnCheck').children('.onofgp').children('label').attr('for', kbnGpId);
+                    
+                    $j(hidnObj).val('true');
+                }
+                catch(e){
+                    alert(e.message);
+                }
+            }
+            
+            // 行削除制御
+            function removeList(obj) {
+                try{
+                    $j(obj).parent().parent().parent().remove();
+                }
+                catch(e){
+                    alert(e.message);
+                }
+            }
+            
+            // ドラッグ後のイベント
+            $j('#DetailTableCon').bind('sortstop',function(){
+            });
+            
+            //日付のフォーマット
+            function formatDate(value) {
+                if (value) {
+                    var date = new Date(value);
+                    var y = date.getFullYear();
+                    var m = date.getMonth() + 1;
+                    var d = date.getDate();
+                    return y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+                } else {
+                    return '';
+                }
+            }
+            // 日付チェック関数
+            function ckDate(datestr) {
+                //空白ならfalse(不正な日付も空白で帰ってくるため)
+                if(datestr == ""){
+                    return false;
+                }
+                // 正規表現による書式チェック
+                if(!datestr.match(/^\d{4}\-\d{2}\-\d{2}$/)){
+                    return false;
+                }
+                var vYear = datestr.substr(0, 4) - 0;
+                var vMonth = datestr.substr(5, 2) - 1; // Javascriptは、0-11で表現
+                var vDay = datestr.substr(8, 2) - 0;
+                // 月,日の妥当性チェック
+                if(vMonth >= 0 && vMonth <= 11 && vDay >= 1 && vDay <= 31){
+                    var vDt = new Date(vYear, vMonth, vDay);
+                    if(isNaN(vDt)){
+                        return false;
+                    }else if(vDt.getFullYear() == vYear && vDt.getMonth() == vMonth && vDt.getDate() == vDay){
+                        return true;
+                    }else{
+                        return false;
+                    }
+                }else{
+                    return false;
+                }
+            }
+            
+            // 保存前チェック
+            function saveCheck() {
+                if($j('[id$=HeadOrderNoSearchTxt]').val() == ''){
+                    alert('受注№を選択してください。');
+                    return false;
+                }
+                if($j('[id$=inputItemFr]').val() == null || $j('[id$=inputItemTo]').val() == null){
+                    alert('項番を選択してください。');
+                    return false;
+                }
+                if($j('[id$=inptWorkNo]').val() == ''){
+                    alert('ワーク№を登録してください。');
+                    return false;
+                }
+                if (ckDate($j('[id$=inptDateFId]').val()) == false){
+                    alert('開始作業日が不正です。');
+                    return false;
+                }
+                if (ckDate($j('[id$=inptDateTId]').val()) == false){
+                    alert('終了作業日が不正です。');
+                    return false;
+                }
+                if ($j('[id$=inptDateFId]').val() != '' && $j('[id$=inptDateTId]').val() != ''){
+                    if ($j('[id$=inptDateTId]').val() < $j('[id$=inptDateFId]').val()){
+                        alert('日付の大小関係が不正です。');
+                        return false;
+                    }
+                }
+                
+                // 桁数チェック
+                if($j('[id$=HeadOrderNoSearchTxt]').val().length > 9){
+                    alert('受注№の桁数が不正です。9桁以下');
+                    return false;
+                }
+                if($j('[id$=inputItemFr]').val().length > 3){
+                    alert('開始項番の桁数が不正です。3桁以下');
+                    return false;
+                }
+                if($j('[id$=inputItemTo]').val().length > 3){
+                    alert('終了項番の桁数が不正です。3桁以下');
+                    return false;
+                }
+                if($j('[id$=inptWorkNo]').val().length > 25){
+                    alert('ワーク№の桁数が不正です。25桁以下');
+                    return false;
+                }
+                if($j('[id$=headTel]').val().length > 20){
+                    alert('電話番号の桁数が不正です。20桁以下');
+                    return false;
+                }
+                if($j('[id$=headAdres]').val().length > 255){
+                    alert('住所の桁数が不正です。255桁以下');
+                    return false;
+                }
+                if($j('[id$=headStaffNm]').val().length > 25){
+                    alert('顧客担当者の桁数が不正です。25桁以下');
+                    return false;
+                }
+                if($j('[id$=headorgNm]').val().length > 255){
+                    alert('顧客担当所属の桁数が不正です。255桁以下');
+                    return false;
+                }
+                if($j('[id$=headUserNm]').val().length > 100){
+                    alert('作業担当者の桁数が不正です。100桁以下');
+                    return false;
+                }
+                if($j('[id$=headUserOrg]').val().length > 100){
+                    alert('作業担当所属の桁数が不正です。100桁以下');
+                    return false;
+                }
+                if($j('[id$=headRemarks]').val().length > 200){
+                    alert('備考の桁数が不正です。200桁以下');
+                    return false;
+                }
+                
+                if(DtlTable.rows.length <= 1){
+                    alert('明細がありません。');
+                    return false;
+                }
+                //明細チェック
+                var wkInpKbn = '';
+                var tr = $j("#DtlTable tr");//テーブルの全行を取得  
+                var GroupName = '';              
+                for( var i=1,l=tr.length-1;i<l;i++ ){
+                    var cells = '';
+                    // グループ取得
+                    cells = tr.eq(i).children('#dtl_SouchinyuNm').css('Display');
+                    
+                    // 1行目がグループでない場合、エラー
+                    if(i == 1 && cells != 'none'){
+                        alert('1行目は必ずグループを設定してください。');
+                        return false;
+                    }
+                    
+                    if(cells == 'none'){
+                        GroupName = tr.eq(i).children('#dtl_Sagyo').children('input').val();
+                        if(GroupName == ''){
+                            alert('作業チェック項目が設定されていません');
+                            return false;
+                        }
+                        if(tr.eq(i).children('#dtl_GpKbnCheck').children('.onofgp').children('input').prop('checked')){
+                            wkInpKbn = '採取';
+                        }
+                        else{
+                            wkInpKbn = '入力';
+                        }
+                    }
+                    else{
+                        
+                        //// 報告書チェック区分
+                        //cells = tr.eq(i).children('#dtl_Check').children('label').children('input').prop('checked');
+                        // 装置名 
+                        var SouchiNm = tr.eq(i).children('#dtl_SouchinyuNm').children('[id$=inputSouchiNm]').val();
+                        if(SouchiNm.length > 150){
+                            alert('装置名の桁数が不正です。150桁以下');
+                            return false;
+                        }
+                        // 型番
+                        var kataban = tr.eq(i).children('#dtl_Kataban').children('input').val();
+                        if(kataban.length > 30){
+                            alert('型番の桁数が不正です。30桁以下');
+                            return false;
+                        }
+                        // 数量
+                        var suryo = tr.eq(i).children('#dtl_Suryo').children('input').val();
+                        if(suryo.length > 4){
+                            alert('数量の桁数が不正です。4桁以下');
+                            return false;
+                        }
+                        
+                        // 設置報告書区分
+                        var souchiName = tr.eq(i).children('#dtl_Kbn').children('select').val();
+                        // 備考
+                        var biko = tr.eq(i).children('#dtl_Biko').children('input').val();
+                        if(biko.length > 10){
+                            alert('備考の桁数が不正です。10桁以下');
+                            return false;
+                        }
+                        
+                        // 商品体系
+                        //alert(souchiName );
+                        if(souchiName == '装置'){
+                            var strPdsccd = tr.eq(i).children('#dtl_SouchinyuNm').children('[id$=inputPdsccd]').val();
+                            if(strPdsccd.slice(0,9) == '010100100' || strPdsccd.slice(0,9) == '010100200'){
+                                if( wkInpKbn == '入力'){
+                                    alert('同一作業チェックグループ内に異なる商品体系が混在しています。\r\n' + i + '行目\r\nグループ：' + GroupName + '\r\n 装置名：' + SouchiNm );
+                                    return false;
+                                }
+                            }
+                            else if(strPdsccd.slice(0,12) == '010100300310' || strPdsccd.slice(0,12) == '010100300315'){
+                                if( wkInpKbn == '入力'){
+                                    alert('同一作業チェックグループ内に異なる商品体系が混在しています。\r\n' + i + '行目\r\nグループ：' + GroupName + '\r\n 装置名：' + SouchiNm );
+                                    return false;
+                                }
+                            }
+                                else if(strPdsccd.slice(0,9) == '010100250' || strPdsccd.slice(0,9) == '010100500'){
+                                    if( wkInpKbn == '採取'){
+                                        alert('同一作業チェックグループ内に異なる商品体系が混在しています。\r\n' + i + '行目\r\nグループ：' + GroupName + '\r\n 装置名：' + SouchiNm );
+                                        return false;
+                                    }
+                                }
+                                    else if(strPdsccd.slice(0,12) >= '010100300330' && strPdsccd.slice(0,12) <= '010100300399'){
+                                        if( wkInpKbn == '採取'){
+                                            alert('同一作業チェックグループ内に異なる商品体系が混在しています。\r\n' + i + '行目\r\nグループ：' + GroupName + '\r\n 装置名：' + SouchiNm );
+                                            return false;
+                                        }
+                                    }
+                        }
+                        
+                    }
+                }
+                saveAF(CreateTableToJson());
+                return false;
+            }
+            function footerDisp(){
+                $j('[id$=lblWorkChk]').css('display', '');
+                $j('[id$=btnReport]').css('display', '');
+                $j('[id$=btnSign]').css('display', '');
+                $j('[id$=btnConfirm]').css('display', '');
+                
+            }
+            
+            
+            function CreateTableToJson(){
+                var TableLists = [];
+                var tr = $j("#DtlTable tr");//テーブルの全行を取得
+                if (tr.length < 1) return '';
+                for( var i=1,l=tr.length;i<l;i++ ){
+                    var wkJson = '';
+                    var cells = '';
+                    
+                    // 行ナンバー
+                    wkJson += '{"dtl_No" : "' + i + '"';
+                    // グループ取得
+                    cells = tr.eq(i).children('#dtl_SouchinyuNm').css('Display');
+                    if(cells == 'none'){
+                        // グループフラグ
+                        wkJson += ' , "dtl_Grpflg" : true';
+                        // 装置名 
+                        wkJson += ' , "dtl_SouchinyuNm" : "作業チェックグループ"';
+                        // 型番
+                        wkJson += ' , "dtl_Kataban" : "Group"';
+                        // 数量
+                        wkJson += ' , "dtl_Suryo" : "0"';
+                        // 単位
+                        wkJson += ' , "dtl_Tani" : ""';
+                        // 設置報告書区分
+                        wkJson += ' , "dtl_Kbn" : "その他"';
+                        // 備考
+                        wkJson += ' , "dtl_Biko" : ""';
+                        // 商品体系
+                        wkJson += ' , "dtl_Pdsccd" : ""';
+                        // 入力区分
+                        if(tr.eq(i).children('#dtl_GpKbnCheck').children('.onofgp').children('input').prop('checked')){
+                            wkJson += ' , "dtl_InpKbnStr" : "採取"';
+                        }
+                        else{
+                            wkJson += ' , "dtl_InpKbnStr" : "入力"';
+                        }
+                        // 作業チェック項目
+                        cells = tr.eq(i).children('#dtl_Sagyo').children('input').val();
+                        wkJson += ' , "dtl_GrpChkName" : "' + cells + '"';
+                    }
+                    else {
+                        // グループフラグ
+                        wkJson += ' , "dtl_Grpflg" : false';
+                        // 装置名
+                        cells = tr.eq(i).children('#dtl_SouchinyuNm').children('[id$=inputSouchiNm]').val();
+                        wkJson += ' , "dtl_SouchinyuNm" : "' + cells + '"';
+                        // 型番
+                        cells = tr.eq(i).children('#dtl_Kataban').children('input').val();
+                        wkJson += ' , "dtl_Kataban" : "' + cells + '"';
+                        // 数量
+                        cells = tr.eq(i).children('#dtl_Suryo').children('input').val();
+                        if(cells == '') cells = 0;
+                        wkJson += ' , "dtl_Suryo" : "' + cells + '"';
+                        // 単位
+                        cells = tr.eq(i).children('#dtl_Suryo').children('#dtl_Tani').text();
+                        wkJson += ' , "dtl_Tani" : "' + cells + '"';
+                        // 設置報告書区分
+                        cells = tr.eq(i).children('#dtl_Kbn').children('select').val(); //children('option option:selected').val();
+                        wkJson += ' , "dtl_Kbn" : "' + cells + '"';
+                        // 備考
+                        cells = tr.eq(i).children('#dtl_Biko').children('input').val();
+                        wkJson += ' , "dtl_Biko" : "' + cells + '"';
+                        // 商品体系
+                        cells = tr.eq(i).children('#dtl_SouchinyuNm').children('[id$=inputPdsccd]').val();
+                        wkJson += ' , "dtl_Pdsccd" : "' + cells + '"';
+                        // 入力区分
+                        if(tr.eq(i).children('#dtl_DtKbnCheck').children('.onofdt').children('input').prop('checked')){
+                            wkJson += ' , "dtl_InpKbnStr" : "数量入力"';
+                        }
+                        else{
+                            wkJson += ' , "dtl_InpKbnStr" : "チェック"';
+                        }
+                        // 作業チェック項目
+                        wkJson += ' , "dtl_GrpChkName" : ""';
+                    }
+                    //-- 
+                    wkJson += '}';
+                    TableLists.push(wkJson);
+                }
+                var strJson = '[' +  TableLists.join(',') + ']';
+                return strJson;
+            } 
+            
+            // 帳票出力
+            function reportOutput(urlPDF){
+                // ヘッダデータ出力
+                var strRepId = '{!Repid}';
+                var strURL = urlPDF + '?Id=' + '{!Repid}';
+                //window.open(strURL,'_blank','');
+                
+                {!$RemoteAction.AC2_Main_Ctrl.PDFSaveAndOutput}(strURL ,strRepId , function(result, event){
+                    if(event.status) {
+                        var strFileUrl = '/servlet/servlet.FileDownload?file=' + result;
+                        window.open(strFileUrl ,'_blank','');
+                    }
+                });
+            }
+            
+            // zipダウンロード
+            function downloadFromObjectId(){
+                try{
+                    //作業チェック一覧作成用 取引先 (基本情報取得ダウンロード)
+                    var rId = '{!$Label.AC2_WorkAcc}'; //'001O0000014oVXP'; 
+                    //sforce.connection.sessionId = '{!$Api.Session_ID}';
+                    //var response = sforce.apex.execute("AC2_Main_Ctrl","getAttachmentByParentId",{sfdcId:rId});
+                    
+                    var response = '';
+                    {!$RemoteAction.AC2_Main_Ctrl.AttachmentByParentId}(rId , function(result1, event1){
+                        if(event1.status) {
+                            var zip = new JSZip();
+                            var FoldNm = '{!downloadFolder}';
+                            var jsonresult1 = result1.replace(/&qu/g, '"');
+                            jsonresult1 = jsonresult1.replace(/ot;/g, '');
+                            var respObj1 = JSON.parse(jsonresult1);
+                            var fileData1 = respObj1['data'];
+                            for( var k = 0; k < fileData1.length; k++  ) {
+                                switch(fileData1[k]['Name']){
+                                    case 'EquipmentInformationMaintenance.htm' : zip.folder(FoldNm).file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'Dummy.txt' :
+                                        zip.folder(FoldNm).folder('Data').folder('Extraction').file(null);
+                                        zip.folder(FoldNm).folder('Source').folder('tmp').file(null);
+                                        break;
+                                    case 'Soft_infomation_get.vbs' : zip.folder(FoldNm).folder('Source').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'encoding.js' : zip.folder(FoldNm).folder('Source').folder('include').folder('js').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'print.css' : zip.folder(FoldNm).folder('Source').folder('include').folder('css').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'jquery-ui-1.9.2.custom.css' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_444444_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_555555_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_777620_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_777777_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_cc0000_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'ui-icons_ffffff_256x240.png' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('css').folder('base').folder('images').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'jquery-1.9.1.min.js' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('js').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'jquery-ui-1.9.2.custom.min.js' : zip.folder(FoldNm).folder('Source').folder('jquery-ui-1.9.2.custom').folder('js').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'pqgrid.min.css' : zip.folder(FoldNm).folder('Source').folder('pqgrid').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'pqgrid.min.js' : zip.folder(FoldNm).folder('Source').folder('pqgrid').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'pqgrid.css' : zip.folder(FoldNm).folder('Source').folder('pqgrid').folder('themes').folder('Office').file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                    case 'decode.bat' : zip.folder(FoldNm).file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true});
+                                    default : zip.folder(FoldNm).file(fileData1[k]['Name'], fileData1[k]['Body'].toString(),{base64: true}); break;
+                                }
+                            }
+                            //HTML,BATダウンロード
+                            rId = '{!Repid}'; 
+                            //response = sforce.apex.execute("AC2_Main_Ctrl","getAttachmentByParentId",{sfdcId:rId});
+                            {!$RemoteAction.AC2_Main_Ctrl.AttachmentByParentId}(rId , function(result2, event2){
+                                if(event2.status) {
+                                    
+                                    var jsonresult2 = result2.replace(/&qu/g, '"');
+                                    jsonresult2 = jsonresult2.replace(/ot;/g, '');
+                                    
+                                    //alert('jsonresult2 ' + jsonresult2 );
+                                    var respObj2 = JSON.parse(jsonresult2);
+                                    var fileData2 = respObj2['data'];
+                                    for( var k = 0; k < fileData2.length; k++  ) {
+                                        var Filename = fileData2[k]['Name'];
+                                        if(Filename.match('.bat')){
+                                            zip.folder(FoldNm).file(fileData2[k]['Name'], fileData2[k]['Body'].toString(),{base64: true});
+                                        }
+                                        if(Filename.match('.htm')){
+                                            zip.folder(FoldNm).folder('Source').file(fileData2[k]['Name'], fileData2[k]['Body'].toString(),{base64: true});
+                                        }
+                                    }
+                                    //zip.generateAsync({type:"base64"}).then(function (content) {
+                                    //    location.href="data:application/zip;base64,"+content;
+                                    //});
+                                    zip.generateAsync({type:"blob"})
+                                    .then(function(content) {
+                                        // see FileSaver.js
+                                        try{
+                                            var fileName = "{!H_WorkNo}_";
+                                            fileName += getSysdate();
+                                            fileName += ".zip";
+                                            saveAs(content, fileName );
+                                        }
+                                        catch(e){
+                                            alert(e.message);
+                                        }
+                                        closeloadingspinner();
+                                        alert('ダウンロードが完了しました。zipを解凍して使用してください。');
+                                        {!$RemoteAction.AC2_Main_Ctrl.AttachmentDelete}('{!Repid}', function(result, event){});
+                                    });
+                                }
+                            });
+                        }
+                        else{
+                            alert(event1.status);
+                        }
+                    });
+                } catch (e) {
+                    closeloadingspinner();
+                    alert(e);
+                    
+                }
+            }
+            
+            function str_to_unicode_array( str ){
+                var arr = [];
+                for( var i = 0; i < str.length; i ++ ){
+                    arr.push( str.charCodeAt( i ) );
+                }
+                return arr;
+            }
+            
+            function getSysdate() {
+                var date = new Date(); 
+                var y = date.getFullYear();
+                var mo = date.getMonth() + 1;
+                var d = date.getDate();
+                var h = date.getHours(); 
+                var mi = date.getMinutes(); 
+                var s = date.getSeconds();
+                var mydate = y + (mo < 10 ? '0' : '') + mo + (d < 10 ? '0' : '') + d;
+                mydate += (h < 10 ? '0' : '') + h + (mi < 10 ? '0' : '') + mi + (s < 10 ? '0' : '') + s;
+                // alert(mydate );
+                return mydate;
+            }
+            </script>
+            <style type="text/css">
+                
+                .slds-docked-form-footer {
+                position: fixed;
+                bottom: 0;
+                width: 100%;
+                left: 0;
+                background: #f4f6f9;
+                box-shadow: 0 -2px 2px 0 rgba(0,0,0,.16);
+                z-index: 8000;
+                display: -ms-flexbox;
+                display: flex;
+                -ms-flex-pack: center;
+                justify-content: center;
+                padding: .5rem 0;
+                }
+                
+                .arrow_box {
+                display: none;
+                position: absolute;
+                padding: 16px;
+                -webkit-border-radius: 8px;
+                -moz-border-radius: 8px;  
+                border-radius: 8px;
+                background: #333;
+                color: #fff;
+                }
+                
+                .arrow_box:after {
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                width: 0;
+                height: 0;
+                margin-left: -10px;
+                border: solid transparent;
+                border-color: rgba(51, 51, 51, 0);
+                border-bottom-color: #333;
+                border-width: 10px;
+                pointer-events: none;
+                content: " ";
+                }
+                .onofgp {
+                position: relative; width: 93px;
+                -webkit-user-select:none; -moz-user-select:none; -ms-user-select: none;
+                }
+                .onofgp-checkbox {
+                display: none;
+                }
+                .onofgp-label {
+                display: block; overflow: hidden; cursor: pointer;
+                border: 2px solid #999999; border-radius: 20px;
+                }
+                .onofgp-inner {
+                display: block; width: 200%; margin-left: -100%;
+                transition: margin 0.3s ease-in 0s;
+                }
+                .onofgp-inner:before, .onofgp-inner:after {
+                display: block; float: left; width: 50%; height: 30px; padding: 0; line-height: 30px;
+                font-size: 12px; color: white; font-family: Trebuchet, Arial, sans-serif; font-weight: bold;
+                box-sizing: border-box;
+                }
+                .onofgp-inner:before {
+                content: "採　取";
+                padding-left: 10px;
+                background-color: #FFFFFF; color: #0C1661;
+                }
+                .onofgp-inner:after {
+                content: "入　力";
+                padding-right: 10px;
+                background-color: hsla(238,85%,92%,1); color: #999999;
+                text-align: right;
+                }
+                .onofgp-switch {
+                display: block; width: 18px; margin: 6px;
+                background: #FFFFFF;
+                position: absolute; top: 0; bottom: 0;
+                right: 59px;
+                border: 2px solid #999999; border-radius: 20px;
+                transition: all 0.3s ease-in 0s; 
+                }
+                .onofgp-checkbox:checked + .onofgp-label .onofgp-inner {
+                margin-left: 0;
+                }
+                .onofgp-checkbox:checked + .onofgp-label .onofgp-switch {
+                right: 0px; 
+                }
+                .onofdt {
+                position: relative; width: 93px;
+                -webkit-user-select:none; -moz-user-select:none; -ms-user-select: none;
+                }
+                .onofdt-checkbox {
+                display: none;
+                }
+                .onofdt-label {
+                display: block; overflow: hidden; cursor: pointer;
+                border: 2px solid #999999; border-radius: 20px;
+                }
+                .onofdt-inner {
+                display: block; width: 200%; margin-left: -100%;
+                transition: margin 0.3s ease-in 0s;
+                }
+                .onofdt-inner:before, .onofdt-inner:after {
+                display: block; float: left; width: 50%; height: 30px; padding: 0; line-height: 30px;
+                font-size: 12px; color: white; font-family: Trebuchet, Arial, sans-serif; font-weight: bold;
+                box-sizing: border-box;
+                }
+                .onofdt-inner:before {
+                content: "数量入力";
+                padding-left: 10px;
+                background-color: #61ABFF; color: #FFFFFF;
+                }
+                .onofdt-inner:after {
+                content: "チェック";
+                padding-right: 10px;
+                background-color: #EEEEEE; color: #999999;
+                text-align: right;
+                }
+                .onofdt-switch {
+                display: block; width: 18px; margin: 6px;
+                background: #FFFFFF;
+                position: absolute; top: 0; bottom: 0;
+                right: 59px;
+                border: 2px solid #999999; border-radius: 20px;
+                transition: all 0.3s ease-in 0s; 
+                }
+                .onofdt-checkbox:checked + .onofdt-label .onofdt-inner {
+                margin-left: 0;
+                }
+                .onofdt-checkbox:checked + .onofdt-label .onofdt-switch {
+                right: 0px; 
+                }
+                
+                .onofwk {
+                position: relative; width: 93px;
+                -webkit-user-select:none; -moz-user-select:none; -ms-user-select: none;
+                }
+                .onofwk-checkbox {
+                display: none;
+                }
+                .onofwk-label {
+                display: block; overflow: hidden; cursor: pointer;
+                border: 2px solid #999999; border-radius: 20px;
+                }
+                .onofwk-inner {
+                display: block; width: 200%; margin-left: -100%;
+                transition: margin 0.3s ease-in 0s;
+                }
+                .onofwk-inner:before, .onofwk-inner:after {
+                display: block; float: left; width: 50%; height: 30px; padding: 0; line-height: 30px;
+                font-size: 12px; color: white; font-family: Trebuchet, Arial, sans-serif; font-weight: bold;
+                box-sizing: border-box;
+                }
+                .onofwk-inner:before {
+                content: "タイトル";
+                padding-left: 10px;
+                background-color: #61ABFF; color: #FFFFFF;
+                }
+                .onofwk-inner:after {
+                content: "項目";
+                padding-right: 10px;
+                background-color: #EEEEEE; color: #999999;
+                text-align: right;
+                }
+                .onofwk-switch {
+                display: block; width: 18px; margin: 6px;
+                background: #FFFFFF;
+                position: absolute; top: 0; bottom: 0;
+                right: 59px;
+                border: 2px solid #999999; border-radius: 20px;
+                transition: all 0.3s ease-in 0s; 
+                }
+                .onofwk-checkbox:checked + .onofwk-label .onofwk-inner {
+                margin-left: 0;
+                }
+                .onofwk-checkbox:checked + .onofwk-label .onofwk-switch {
+                right: 0px; 
+                }
+                .workItemRow tbody tr td {
+                padding: 0px 0px 0px 0px;border-top-width: 0px;
+                }
+                .pdfContext{
+                    font-weight: bold;
+                    color: blue;
+                }
+                .onlyDisplayText{
+                    background-color: rgb(224, 229, 238);
+                }
+                .button-Jyotai:hover {
+                    background-image: none;
+                    background-color: #0070d2;;
+                    border-color: #ccc;
+                }
+                
+                
+            </style>
+        </head>
+        <body>
+            <apex:form id="mainFormId" target="_blank">
+                <!--<div style="background-color: #99cc00">カーソルの移動はtabを使用してください。enterは無効にしています。</div>-->
+                <apex:outputpanel id="MainHeadPanel1">
+                    <apex:inputhidden id="saveMessage" value="{!saveMessage}"/>
+                    <script>
+                    $j = jQuery.noConflict();
+                    // 保存処理後
+                    function SaveBefore(){
+                        var msg = $j('[id$=saveMessage]').val();
+                        if(msg != ''){
+                            alert(msg);
+                            return;
+                        }
+                        alert('更新しました');
+                        var LocalUrl = location.href;
+                        if(LocalUrl.indexOf('Repid=') > 0){
+                            location.reload();
+                        }
+                        else{
+                            LocalUrl += '&Repid=' + '{!Repid}';
+                            location.href = LocalUrl;
+                        }
+                    }
+                    </script>
+                </apex:outputpanel>
+                <div class="slds">
+                    <div class="slds-page-header" role="banner">
+                        <div class="slds-grid">
+                            <div class="slds-col slds-has-flexi-truncate">
+                                <div class="slds-media">
+                                    <div class="slds-media__figure">
+                                        <svg aria-hidden="true" class="slds-icon slds-icon--large slds-icon-standard-user">
+                                            <use xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/standard-sprite/svg/symbols.svg#account')}"></use>
+                                        </svg>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <p class="slds-text-heading--label">取引先</p>
+                                        <div class="slds-grid">
+                                            <h1 class="slds-text-heading--medium slds-m-right--small slds-truncate slds-align-middle" title="Record Title">{!Account.Name}</h1>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slds-grid slds-page-header__detail-row" style="margin-left: 0px; margin-right: 0px;margin-bottom: 0px;">
+                        <div class="slds-p-horizontal slds-size--1-of-4">             
+                            <label class="slds-form-element__label">受注№</label>
+                            <div class="slds-form-element__control" style="width:90%">
+                                <div class="slds-input-has-icon slds-input-has-icon--right" >
+                                    <svg aria-hidden="true" id="HeadOrderNoSearchSvg" class="slds-input__icon" onclick="showOrderSearchDialog();">
+                                        <use xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/utility-sprite/svg/symbols.svg#search')}"></use>
+                                    </svg>
+                                    <apex:inputText styleClass="slds-lookup__search-input slds-input" value="{!H_OrdNo}" id="HeadOrderNoSearchTxt"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-p-horizonta slds-size--1-of-8">
+                            <label class="slds-form-element__label">項番(開始)</label>
+                            <div id="selectthFr" style="width:90%">
+                                <apex:inputText id="inputItemFr" value="{!H_ItemFr}" styleClass="slds-input"/>
+                            </div>
+                        </div>
+                        <div class="slds-p-horizonta slds-size--1-of-8">
+                            <label class="slds-form-element__label">項番(終了)</label>
+                            <div id="selectthTo" style="width:90%">
+                                <apex:inputText id="inputItemTo" value="{!H_ItemTo}" styleClass="slds-input"/>
+                            </div>
+                        </div>
+                        <div class="slds-form-element slds-size--1-of-4">
+                            <label class="slds-form-element__label">&nbsp;</label>
+                            <div class="slds-form-element__control">
+                                <apex:commandButton id="orderReadButton" styleClass="slds-button slds-button--neutral" value="読込" onclick="setDetail('FALSE'); return false;"/>
+                            </div>
+                        </div>
+                        <div class="slds-p-horizontal slds-size--1-of-8">
+                        </div>
+                        <!--
+                        <div class="slds-p-horizontal slds-size--1-of-8">
+                            <label class="slds-form-element__label">&nbsp;</label>
+                            <div><p Class="slds-button slds-button--brand button-Jyotai" style="float:right;hover">状態：{!MStatus}</p></div>
+                        </div>
+                        -->
+                    </div>
+                    <fieldset class="slds-form--compound" style="margin-left: 1em; width:98%;">
+                        <div class="form-element__group">
+                            <div class="slds-form-element__row">
+                                <div class="slds-form-element slds-size--1-of-1">
+                                    <label class="slds-form-element__label">詳細情報</label>
+                                    <ul class="slds-list--vertical slds-has-cards--space">
+                                        <li class="slds-list__item" style="background-color:#f7f9fb;">
+                                            <apex:outputpanel id="MainHeadPanel2">
+                                                <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;">
+                                                    <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                        <label class="slds-form-element__label">ワーク№</label>
+                                                        <apex:inputText id="inptWorkNo" value="{!H_WorkNo}" styleClass="slds-input" style="width: 90%;"/>
+                                                    </div>
+                                                    <div class="slds-p-horizontal slds-size--1-of-4">
+                                                        <label class="slds-form-element__label">作業日(開始)</label>
+                                                        <apex:input id="inptDateFId" value="{!H_WDayF}" styleClass="slds-input" type="date" style="width: 90%;"/>
+                                                    </div>
+                                                    <div class="slds-p-horizontal slds-size--1-of-4">
+                                                        <label class="slds-form-element__label">作業日(終了)</label>
+                                                        <apex:input id="inptDateTId" value="{!H_WDayT}" styleClass="slds-input" type="date" style="width: 90%;"/>
+                                                    </div>
+                                                </div>
+                                            </apex:outputpanel>
+                                            <br/>
+                                            <span class="trigger none-submenu">
+                                                <div style="word-wrap: break-word;" id="selectedPlanDiv">タップして表示</div>
+                                            </span>
+                                            <ul class="submenu">
+                                                <li>
+                                                    <div class="slds-modal__content" style="height:310px;margin-top: 10px;">
+                                                        <apex:outputpanel id="MainHeadPanel3">
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label" >見積№</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:outputText value="{!H_MitsuNo}" styleClass="slds-input onlyDisplayText" id="headEstimate"/>
+                                                                    <apex:inputHidden value="{!H_MitsuNo}" id="headEstimateHdn"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext">代表品名</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:inputText value="{!H_Daihyo}" styleClass="slds-input" style="width: 90%;" id="headExamItemNm"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label" >受注先コード</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:outputText value="{!H_NonCd}" styleClass="slds-input onlyDisplayText" id="headNonyuCd"/>
+                                                                    <apex:inputHidden value="{!H_NonCd}" id="headNonyuCdHdn"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext">受注先名</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:outputText value="{!H_NonNm}" styleClass="slds-input onlyDisplayText" style="width: 90%;" id="headNonyuNm"/>
+                                                                    <apex:inputHidden value="{!H_NonNm}" id="headNonyuNmHdn"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext" >電話番号</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:inputText value="{!H_Tel}" styleClass="slds-input" id="headTel"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext">住所</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:inputText value="{!H_Ads}" styleClass="slds-input" style="width: 90%;" id="headAdres"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">      
+                                                                    <label class="slds-form-element__label pdfContext">顧客担当者</label>    
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:inputText value="{!H_KoTan}" styleClass="slds-input" id="headStaffNm"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">  
+                                                                    <label class="slds-form-element__label pdfContext" >顧客担当所属</label>  
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:inputText value="{!H_KoSho}" styleClass="slds-input" style="width: 90%;" id="headorgNm"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label" >営業担当者</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:outputText value="{!H_EiTan}" styleClass="slds-input onlyDisplayText" id="headGroupNm"/>
+                                                                    <apex:inputHidden value="{!H_EiTan}" id="headGroupNmHdn"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label">営業担当所属</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:outputText value="{!H_EiSho}" styleClass="slds-input onlyDisplayText" style="width: 90%;" id="headPersonNm"/>
+                                                                    <apex:inputHidden value="{!H_EiSho}" id="headPersonNmHdn"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext" >作業担当者</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-4">       
+                                                                    <apex:inputText styleClass="slds-input" id="headUserNm" value="{!H_SaTan}"/>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext">作業担当所属</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--1-of-2"> 
+                                                                    <apex:inputText styleClass="slds-input" style="width: 90%;" id="headUserOrg" value="{!H_SaSho}"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;margin-top: 0.5em;">
+                                                                
+                                                                <div class="slds-p-horizontal slds-size--1-of-12" style="text-align: center;">       
+                                                                    <label class="slds-form-element__label pdfContext">備考</label>
+                                                                </div>
+                                                                <div class="slds-p-horizontal slds-size--10-of-12" style="text-align: center;"> 
+                                                                    <apex:inputTextarea value="{!H_Biko}" styleClass="slds-input" id="headRemarks" />
+                                                                </div>
+                                                            </div>
+                                                        </apex:outputpanel>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <br/>
+                    
+                    <apex:outputpanel id="DetailTablePanel">
+                        <div>           
+                            <table id="DtlTable" class="slds-table slds-table--bordered slds-table--fixed-layout" role="grid">
+                                <thead class="scrollHead">
+                                    <tr class="slds-text-heading--label">
+                                        <th role="gridcell" class="slds-cell-shrink" scope="col" style="width:130px; text-align: center;" >…</th>                                        
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_SouchiNm"  style="width:30%; text-align: center;">
+                                            <span class="slds-truncate" title="装置名" >装置名</span>
+                                        </th>
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_Kataban"  style="width:12%; text-align: center;" >
+                                            <span class="slds-truncate" title="型番" >型番</span>
+                                        </th>
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_Suryo"  style="width:8%; text-align: center;" >
+                                            <span class="slds-truncate" title="数量" >数量</span>
+                                        </th>
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_Kbn" style="width:8%; text-align: center;" >
+                                            <span class="slds-truncate" title="装置報告名" >設置報告書区分</span>
+                                        </th>
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_Biko"  style="width:12%; text-align: center;" >
+                                            <span class="slds-truncate" title="備考" >備考</span>
+                                        </th>
+                                        <th class="slds-is-sortable slds-is-resizable" scope="col" aria-label="dtl_InpKbnStr"  style="width:110px; text-align: center;" >
+                                            <span class="slds-truncate" title="区分" >区分</span>
+                                        </th>
+                                    </tr>
+                                </thead> 
+                                <tbody id="DetailTableCon">
+                                    <apex:repeat value="{!WITHDetailObj}" var="dtl">
+                                        <tr class="slds-hint-parent">
+                                            <td id="detailMark" role="gridcell" data-label="Selectrow">
+                                                <div class="slds-input-has-icon slds-input-has-icon--right" >
+                                                    <span class="slds-icon_container slds-icon-action-close slds-icon_container--circle" onclick="removeList(this);" >
+                                                        <svg aria-hidden="true" class="slds-icon slds-icon--small">
+                                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/utility-sprite/svg/symbols.svg#close')}"></use>
+                                                        </svg>
+                                                    </span>
+                                                    <p class="arrow_box" style="z-index:1; left: -0.5em;">行削除</p>
+                                                    <span class="slds-icon_container slds-icon-action-join-group slds-icon_container--circle" onclick="addGroup(this,'{!$Component.Grpflg}');" style='{!dtl.dtl_Cnsdsp}'>
+                                                        <svg aria-hidden="true" class="slds-icon slds-icon--small">
+                                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/action-sprite/svg/symbols.svg#join_group')}"></use>
+                                                        </svg>
+                                                    </span>
+                                                    <p class="arrow_box" style="z-index:1;">グループの追加</p>
+                                                    <apex:inputHidden value="{!dtl.dtl_Grpflg}" id="Grpflg"/>
+                                                    <span class="slds-icon_container slds-icon-action-new slds-icon_container--circle" onclick="addList(this);" style='{!dtl.dtl_Cnsdsp}'>
+                                                        <svg aria-hidden="true" class="slds-icon slds-icon--small slds-icon--small">
+                                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/action-sprite/svg/symbols.svg#new')}"></use>
+                                                        </svg>
+                                                    </span>
+                                                    <p class="arrow_box" style="z-index:1; left: 6em;">行追加</p>
+                                                </div>
+                                            </td>
+                                            <td id="dtl_Grpdsp" scope="row" data-label="" colspan="2" style='{!dtl.dtl_Grpdsp} background-color: rgba(172, 201, 218, 0.62);color: #6214ab; font-size: large; font-weight: 600;'>作業チェックグループ</td>
+                                            <td id="dtl_Sagyo" scope="row" data-label="" colspan="3" style='{!dtl.dtl_Grpdsp} background-color: rgba(172, 201, 218, 0.62);'>
+                                                <apex:inputText styleClass="slds-input" id="headWorkSelect" html-placeholder="作業チェック項目を選択します" value="{!dtl.dtl_GrpChkName}" style="width:90%"/>
+                                                <button class="slds-button slds-button--icon-border" aria-haspopup="true" title="作業チェック項目選択" style="background-color: rgba(255, 255, 255, 0.82)" onclick="showWork(this);return false;">
+                                                    <svg aria-hidden="true" class="slds-button__icon">
+                                                        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS0202, '/assets/icons/utility-sprite/svg/symbols.svg#down')}"></use>
+                                                    </svg>
+                                                    <span class="slds-assistive-text">作業チェック項目選択</span>
+                                                </button>
+                                            </td>
+                                            
+                                            <td id="dtl_SouchinyuNm" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'>
+                                                <apex:inputText id="inputSouchiNm" value="{!dtl.dtl_SouchinyuNm}" styleClass="slds-input"/>
+                                                <apex:inputHidden id="inputPdsccd" value="{!dtl.dtl_Pdsccd}"/>
+                                            </td>
+                                            <td id="dtl_Kataban" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'><apex:inputText value="{!dtl.dtl_Kataban}" styleClass="slds-input"/></td>
+                                            <td id="dtl_Suryo" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'>
+                                                <apex:inputText value="{!dtl.dtl_Suryo}" styleClass="slds-input" style="width:70%; text-align: right;float:left;"/>
+                                                <p id="dtl_Tani" style="float: right;vertical-align: bottom;margin-top:10px;">{!dtl.dtl_Tani}</p>
+                                            </td>
+                                            <td id="dtl_Kbn" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'>
+                                                <apex:selectList value="{!dtl.dtl_Kbn}" styleclass="slds-select" size="1" multiselect="false">
+                                                    <apex:selectOptions value="{!Kbn_options}"/>
+                                                </apex:selectList>
+                                            </td>
+                                            <td id="dtl_Biko" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'><apex:inputText value="{!dtl.dtl_Biko}" styleClass="slds-input"/></td>
+                                            <td id="dtl_GpKbnCheck" scope="row" data-label="" style='{!dtl.dtl_Grpdsp}  background-color: rgba(172, 201, 218, 0.62);'>
+                                                <div class="onofgp">
+                                                    <apex:inputCheckbox value="{!dtl.dtl_InpKbn}" styleclass="onofgp-checkbox" id="onofgp" />
+                                                    <label class="onofgp-label" for="{!$Component.onofgp}">
+                                                        <span class="onofgp-inner"></span>
+                                                        <span class="onofgp-switch"></span>
+                                                    </label>
+                                                </div>
+                                            </td>
+                                            <td id="dtl_DtKbnCheck" scope="row" data-label="" style='{!dtl.dtl_Cnsdsp}'>
+                                                <div class="onofdt">
+                                                    <apex:inputCheckbox value="{!dtl.dtl_InpKbn}" styleclass="onofdt-checkbox" id="onofdt" />
+                                                    <label class="onofdt-label" for="{!$Component.onofdt}">
+                                                        <span class="onofdt-inner"></span>
+                                                        <span class="onofdt-switch"></span>
+                                                    </label>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </apex:repeat>
+                                    <script>
+                                    $j = jQuery.noConflict();
+                                    $j('#DetailTableCon').sortable();
+                                    
+                                    // 1行目のグループはmarkを何も表示させない
+                                    var tr = $j("#DetailTableCon tr");
+                                    if(tr.length > 0){
+                                        var cells = tr.eq(0).children('#detailMark').children('div').hide();//
+                                    }
+                                    
+                                    $j('[id$=headWorkSelect]').attr('readonly',true);  
+                                    
+                                    // ドラッグ後のイベント
+                                    $j('#DetailTableCon').bind('sortstop',function(){
+                                    });
+                                    $j('.slds-icon-action-join-group').hover(
+                                        function () {
+                                            $j(this).next('p').show();
+                                        },
+                                        function () {
+                                            $j(this).next('p').hide();
+                                        }
+                                    );
+                                    $j('.slds-icon-action-close').hover(
+                                        function () {
+                                            $j(this).next('p').show();
+                                        },
+                                        function () {
+                                            $j(this).next('p').hide();
+                                        }
+                                    );
+                                    $j('.slds-icon-action-new').hover(
+                                        function () {
+                                            $j(this).next('p').show();
+                                        },
+                                        function () {
+                                            $j(this).next('p').hide();
+                                        }
+                                    );
+                                    </script>
+                                </tbody>
+                                
+                            </table>
+                        </div> 
+                    </apex:outputpanel>
+                    <!-- フッタ -->
+                    <div class="slds-docked-form-footer" >
+                        <Button onclick="return saveCheck();" Class="slds-button slds-button--neutral">保存</Button>
+                        <input type='button' onclick="location.reload();" Class="slds-button slds-button--neutral" value ="キャンセル"/>
+                        <label id="lblWorkChk" class="slds-file-selector__body" onclick="workDownloadJS();" style="margin-left: 5px;margin-right: 5px;{!footDisp}">
+                            <span class="slds-button slds-button--neutral">
+                                <svg aria-hidden="true" class="slds-button__icon slds-button__icon--left">
+                                    <use xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/utility-sprite/svg/symbols.svg#download')}"></use>
+                                </svg>作業チェックツールDL
+                            </span>
+                        </label>
+                        <button id='btnReport' style="{!footDisp}" class="slds-button slds-button--neutral" onclick="reportOutput('{!URLFOR($Page.AC2_Main_PDF)}');return false;">報告書印刷</button>
+                        <apex:commandButton id="btnSign" style="{!footDisp}" value="サイン" styleClass="slds-button slds-button--neutral" action="{!URLFOR($Page.AC2_Main_SignEdit)}?id={!Repid}"/>
+                        <!--<apex:commandLink id="btnConfirm" styleClass="slds-button slds-button--neutral" style="margin-left: 5px;margin-right: 5px;{!footDisp}" action="{!confirm}">設置報告</apex:commandLink>-->
+                    </div>
+                </div>
+                
+                <!--------------------------- action Function ---------------------------->
+                <!-- 受注データ取得 -->
+                <apex:actionFunction name="orderProcessDataAF" action="{! orderProcessData }" rerender="sldsOrderPanel" oncomplete="closeloadingspinner();">
+                    <apex:param name="orderJSON" assignTo="{!orderJSON }" value="" />
+                </apex:actionFunction>
+                
+                <!-- 明細データ取得 -->
+                <apex:actionFunction name="detailProcessDataAF" action="{! detailProcessData }" rerender="DetailTablePanel"  oncomplete="DetailDispAfter();">
+                    <apex:param name="detailJSON" assignTo="{! detailJSON }" value="" />
+                </apex:actionFunction>
+                
+                <!-- 保存 -->
+                <apex:actionFunction name="saveAF" action="{!Save}" rerender="MainHeadPanel1"  oncomplete="SaveBefore();">
+                    <apex:param name="MainDetailJson" assignTo="{!MainDetailJson}" value="" />
+                </apex:actionFunction>
+                
+                <!-- 作業チェックリストダウンロード -->
+                <apex:actionFunction name="workDownloadAF" action="{! workDownload }" oncomplete="downloadFromObjectId();" />
+                
+                <!-- 作業チェック項目検索表示 -->
+                <apex:actionFunction name="WorkSearchDialogDispAF" action="{!WorkDisp}" rerender="WorkHeadPanel,sldsWorkPanel,sldsWorkFoot" oncomplete="showWorkSearchDialog();">
+                    <apex:param name="WorkSelectName" assignTo="{!WorkSelectName}" value="" />
+                    <apex:param name="WorkSearchChoose" assignTo="{!WorkSearchChoose}" value="" />
+                    <apex:param name="WorkSearchText" assignTo="{!WorkSearchText}" value="" />
+                </apex:actionFunction>
+                
+                <!-- 作業チェック項目変更 -->
+                <apex:actionFunction name="WorkGetDetailAF" action="{!WorkGetDetail}" rerender="sldsWorkPanel">
+                    <apex:param name="WorkSelectName" assignTo="{!WorkSelectName}" value="" />
+                </apex:actionFunction>
+                
+                <!-- 作業チェックリスト保存 -->
+                <apex:actionFunction name="WorkSaveAF" action="{!WorkSave}" rerender="WorkHeadPanel" oncomplete="alert('作業チェック項目登録');">
+                    <apex:param name="WorkSaveName" assignTo="{!WorkSaveName}" value="" />
+                    <apex:param name="WorkSelectName" assignTo="{!WorkSelectName}" value="" />
+                    <apex:param name="WorkJson" assignTo="{!WorkJson}" value="" />
+                </apex:actionFunction>
+                
+            </apex:form>       
+            
+            <!--------------------------- 受注検索ダイアログ ---------------------------->
+            <div class="slds" id="sldsOrder" style="z-index:8888;">
+                <div id="orderDialog" style="display:none; ">
+                    <div class="slds-modal slds-fade-in-open slds-modal--large" aria-hidden="false" role="dialog" style="padding-top: 20px;padding-bottom: 20px;margin: auto;">
+                        <div class="slds-modal__container" style="width:95%;padding-top: 20px; padding-bottom: 20px; margin: auto;">
+                            <!-- ヘッダ -->
+                            <div class="slds-modal__header" style="border-bottom-width: 0px;">
+                                <div class="form-element__group">
+                                    <div class="slds-form-element__row">
+                                        <div class="slds-form-element slds-size--1-of-1">
+                                            <ul class="slds-list--vertical slds-has-cards--space">
+                                                <li class="slds-list__item" style="background-color:#f7f9fb;">
+                                                    <div class="slds-grid slds-wrap slds-grid--pull-padded" style="margin-left: 1em;">
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <label class="slds-form-element__label">取引先コード</label>
+                                                            <input type="Text" id="orderSearchAcc" Class="slds-input" style="width:90%;"/>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <label class="slds-form-element__label">売上日(開始)</label>
+                                                            <input id="orderSearchDateFr" Class="slds-input" type="Text" style="width: 90%;" placeholder="YYYYMMDD"/>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <label class="slds-form-element__label">売上日(終了)</label>
+                                                            <input id="orderSearchDateTo" Class="slds-input" type="Text" style="width: 90%;" placeholder="YYYYMMDD"/>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-4">
+                                                            <label class="slds-form-element__label">納入先名(部分一致)</label>
+                                                            <input type="Text" id="orderSearchName" Class="slds-input" style="width:90%;"/>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <label class="slds-form-element__label">電話番号</label>
+                                                            <input type="Text" id="orderSearchTel" Class="slds-input" style="width:90%;"/>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <label class="slds-form-element__label">売上済みを含む</label><br/>
+                                                            <label class="slds-checkbox">
+                                                                <input type="checkbox" id="orderSearchUrichk"/>
+                                                                <span class="slds-checkbox--faux"></span>
+                                                                <span class="slds-assistive-text">売上済みを含む</span>
+                                                            </label>
+                                                        </div>
+                                                        <div class="slds-p-horizontal slds-size--1-of-8">
+                                                            <br/>
+                                                            <button id="orderSearchBtn" class="slds-button slds-button--neutral" onclick="orderSelectDisp(); return false;">受注情報検索</button>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div> 
+                            <!-- 検索 -->
+                            <div id="orderContent" class="slds-modal__content slds-p-around--medium" style="height:100%; padding-top: 0px;">
+                                <apex:outputPanel id="sldsOrderPanel"> 
+                                    <table class="slds-table slds-table--bordered slds-table--fixed-layout" role="grid">
+                                        <thead class="scrollHead">
+                                            <tr class="slds-text-heading--label">
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:7%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" style="" >受注№</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:20%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" >受注先名</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:8%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" >電話番号</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:18%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" >住所</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:24%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" >代表品名</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:7%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" > 営業担当所属</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:8%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" > 営業担当者</span>
+                                                </th>
+                                                <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:8%;text-align:center;" >
+                                                    <span class="slds-truncate" title="Close Date" > 売上予定日</span>
+                                                </th>
+                                            </tr>
+                                        </thead> 
+                                        <tbody>
+                                            <apex:repeat value="{!WITHOrderList}" var="item">
+                                                <tr class="slds-hint-parent" onclick="DetailSelect(true,'{!item.ord_No}','{!item.ord_EstimateNo}','{!item.ord_ExamItemNm}','{!item.ord_Remark}','{!item.ord_NonyuCd}','{!item.ord_NonyuNm}','{!item.ord_MinKouNo}','{!item.ord_MaxKouNo}','{!item.ord_Zipcd}','{!item.ord_Adres}','{!item.ord_Tel}','{!item.ord_orgNm}','{!item.ord_StaffNm}','{!item.ord_GroupNm}','{!item.ord_PersonNm}','{!item.ord_UriageYmd}');closeOrderDialog();">
+                                                    <td scope="row" style="overflow:hidden" >{!item.ord_No}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_NonyuNm}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_Tel}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_Adres}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_ExamItemNm}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_dispOrgNm}</td> 
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_GroupNm}</td>
+                                                    <td scope="row" style="overflow:hidden">{!item.ord_UriyoYmd}</td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </apex:outputPanel>
+                            </div>
+                            <!-- フッタ -->
+                            <div class="slds-modal__footer">      
+                                <button id='imgClose' class="slds-button slds-button--neutral" onclick="closeOrderDialog()">キャンセル</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slds-backdrop slds-backdrop--open"></div>
+                </div>
+                <script>                
+                //[タップして表示]制御
+                $j(".ordmenu").css("display","none");
+                $j(".ordtrig").click(function(){
+                    if($j("+.ordmenu",this).css("display")=="none"){
+                        $j(this).addClass("active-submenu");
+                        $j(this).removeClass("none-submenu");
+                        $j("+ .ordmenu",this).slideDown("normal");
+                    }else{
+                        $j(this).removeClass("active-submenu");
+                        $j(this).addClass("none-submenu");
+                        $j("+.ordmenu",this).slideUp("normal");
+                    }
+                });
+                </script>
+            </div>
+            
+            <!--------------------------- 作業内容一覧検索ダイアログ ---------------------------->
+            <div class="slds" id="sldsWork">
+                <apex:form id="WorkForm" >
+                    <div id="workDialog" style="display:none;">
+                        <div class="slds-modal slds-fade-in-open slds-modal--large" aria-hidden="false" role="dialog" style="padding-left: 100px; padding-right: 100px;">
+                            <div class="slds-modal__container">
+                                <!-- ヘッダ -->
+                                <div class="slds-modal__header"> 
+                                    <div class="slds-grid slds-grid--align-center">
+                                        <div id="WorkNameContainer" class="slds-select_container" style="width:50%;">
+                                            <apex:outputPanel id="WorkHeadPanel">
+                                                <apex:selectList id="WorkCheckNameSelect" value="{!WorkSelectItem}" onchange="WorkCheckNamechange()" style="float: left;" styleclass="slds-select" multiselect="false" size="1">
+                                                    <apex:selectOptions value="{!WorkCheckNameList}"/>
+                                                </apex:selectList>           
+                                            </apex:outputPanel>
+                                        </div>                     
+                                        <div style="width:2%;"/>
+                                        <div id="WorkCooseContainer" class="slds-select_container" style="width:12%;" >
+                                            <apex:selectList id="WorkSelectContext" value="{!WorkChoose}" onchange="WorkSelectchange();" styleclass="slds-select" multiselect="false" size="1">
+                                                <apex:selectOptions value="{!ChooseItems}"/>
+                                            </apex:selectList>
+                                        </div>
+                                        <div style="width:2%;"/>
+                                        <apex:inputText id="WorkSearchText" value="{!WorkSText}" styleClass="slds-input" style="width:23%;" disabled="true"/> 
+                                        <div style="width:2%;"/>
+                                        <button id="imgDisp" class="slds-button slds-button--neutral" onclick="WorkSelectDisp(); return false;">表示</button>
+                                    </div> 
+                                </div> 
+                                <!-- 検索 -->
+                                <div id="workContent" class="slds-modal__content slds-p-around--medium" style="height:80%;">
+                                    <apex:outputPanel id="sldsWorkPanel">  
+                                        <table id="WorkCheckTable" class="slds-table slds-table--bordered slds-table--fixed-layout" role="grid">
+                                            <thead class="scrollHead">
+                                                <tr class="slds-text-heading--label" style="line-height: 3;">
+                                                    <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:20%;" >
+                                                        <CENTER><span class="slds-truncate" title="-" >-</span></CENTER>
+                                                    </th>
+                                                    <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:40%;" >
+                                                        <CENTER><span class="slds-truncate" title="作業内容" >作業内容</span></CENTER>
+                                                    </th>
+                                                    <th class="slds-is-sortable slds-is-resizable" scope="col" style="width:40%;" >
+                                                        <CENTER><span class="slds-truncate" title="区分" >区分</span></CENTER>
+                                                    </th>
+                                                </tr>
+                                            </thead>                                  
+                                            <tbody id="WorkTableCon">
+                                                <apex:repeat value="{!WorkCheckDetailList}" var="item">
+                                                    <tr id="workTr">
+                                                        <td id="dtl_DtKbnCheck" scope="row">
+                                                            <div class="onofwk">
+                                                                <apex:inputCheckbox value="{!item.work_Kbn }" styleclass="onofwk-checkbox" onchange="work_KbnChange(this,'{!$Component.inputWork_Title}','{!$Component.radioWork_Bunrui}');" id="onofwk" disabled="true"/>
+                                                                <label class="onofwk-label" for="{!$Component.onofwk}">
+                                                                    <span class="onofwk-inner"></span>
+                                                                    <span class="onofwk-switch"></span>
+                                                                </label>
+                                                            </div>
+                                                        </td>
+                                                        <td id="tdWorkTitle" scope="row" colspan="{!item.attr_Kbn}">
+                                                            <apex:inputText id="inputWork_Title" value="{!item.work_Title}" styleClass="slds-input" style="width: 90%;" disabled="true" />
+                                                        </td>
+                                                        <td id="tdWorkBunrui" style="padding: 0px 0px 0px 0px;">
+                                                            <apex:selectRadio id="radioWork_Bunrui" value="{!item.work_Bunrui}" style="{!item.attr_Bunrui}" layout="lineDirection" styleClass="workItemRow" disabled="true">
+                                                                <apex:selectOptions value="{!WorkItems}"/>
+                                                            </apex:selectRadio>
+                                                        </td>
+                                                    </tr>
+                                                </apex:repeat>
+                                            </tbody>
+                                        </table>
+                                        <apex:inputHidden id="WorkDeletebleFlg" value="{!WorkDeletebleFlg}" />
+                                    </apex:outputPanel>
+                                </div>
+                                <!-- フッタ -->
+                                <div class="slds-modal__footer">
+                                    <button id="imgModify" class="slds-button slds-button--brand"  style="float: left;" onclick="return ModfyWorkDialog()">編集</button>
+                                    <button id="imgDelete" class="slds-button slds-button--destructive"  style="float: left;" onclick="return DeleteWorkDialog()">削除</button>
+                                    <apex:outputPanel id="sldsWorkFoot">  
+                                        <apex:inputText id="inputSelectName" value="{!WorkSelectSaveName}" styleClass="slds-input" style="Display:none; width: 70%; float: left;" />  
+                                    </apex:outputPanel>  
+                                    <button id="imgClose" class="slds-button slds-button--neutral" onclick="closeWorkDialog(); return false;">キャンセル</button>
+                                    <button id="imgOk" class="slds-button slds-button--brand" onclick="chkWorkSelectDialog();return false;">選択</button>
+                                </div>
+                                <script>
+                                $j = jQuery.noConflict();
+                                
+                                // ドラッグ後のイベント
+                                $j('#WorkTableCon').bind('sortstop',function(){
+                                });
+                                
+                                // 編集ボタン押下時
+                                function ModfyWorkDialog(){
+                                    $j('#WorkTableCon').sortable();
+                                    $j('[id$=onofwk]').prop('disabled',false);
+                                    $j('[id$=inputWork_Title]').prop('disabled',false);
+                                    $j('[name$=radioWork_Bunrui]').prop('disabled',false);
+                                    $j('#imgModify').hide();
+                                    $j('[id$=inputSelectName]').show();
+                                    return false;
+                                }
+                                
+                                function work_KbnChange(obj,objTitle,objBunrui){
+                                    var Title = document.getElementById(objTitle);
+                                    var Bunrui = document.getElementById(objBunrui);
+                                    if($j(obj).prop('checked')) {
+                                        $j(Title).parent().prop('colspan',2);
+                                        $j(Bunrui).hide();
+                                    } else {
+                                        $j(Title).parent().prop('colspan',1);
+                                        $j(Bunrui).show();
+                                    }
+                                }
+                                
+                                function WorkCheckNamechange(){
+                                    $j('#imgModify').show();
+                                    $j('[id$=inputSelectName]').hide();
+                                    var WorkSelectName = $j('[id$=WorkCheckNameSelect]').val();
+                                    $j('[id$=inputSelectName]').val(WorkSelectName);
+                                    WorkGetDetailAF(WorkSelectName);
+                                }
+                                
+                                function WorkSelectchange(){
+                                    if($j('[id$=WorkSelectContext]').val() == 'search'){
+                                        $j('[id$=WorkSearchText]').prop('disabled',false);
+                                    }
+                                    else{
+                                        $j('[id$=WorkSearchText]').prop('disabled',true);
+                                    }
+                                }
+                                
+                                function WorkSelectDisp(){
+                                    var WorkSelectName = $j('[id$=WorkCheckNameSelect]').val();
+                                    var WorkSearchChoose = $j('[id$=WorkSelectContext]').val();
+                                    var WorkSearchText = $j('[id$=WorkSearchText]').val();
+                                    if(WorkSearchText == ''){
+                                        alert('検索文字列は1文字以上入力してください。');
+                                        return false;
+                                    }
+                                    WorkSearchDialogDispAF(WorkSelectName,WorkSearchChoose,WorkSearchText);
+                                }
+                                </script>
+                            </div>
+                        </div>
+                        <div class="slds-backdrop slds-backdrop--open"></div>
+                    </div>
+                </apex:form>
+            </div>
+            <!-- ローディング -->
+            <div class="slds-spinner_container" id="loadingspinner" style="display:none;z-index:99999;position:fixed;top:0px;">
+                <div class="slds-spinner slds-spinner--medium" role="alert">
+                    <span class="slds-assistive-text">Loading</span>
+                    <div class="slds-spinner__dot-a"></div>
+                    <div class="slds-spinner__dot-b"></div>
+                </div>
+            </div>
+        </body>
+    </html>
+</apex:page>
