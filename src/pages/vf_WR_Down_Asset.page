@@ -1,0 +1,205 @@
+<!-- アカウントサポート　ワークレポートプロジェクト -->
+
+<!-- ↓Bootstrap -->
+<apex:page showHeader="false" sidebar="false" docType="html-5.0" applyHTMLTag="false" applyBodyTag="false" cache="false"
+ standardController="user" extensions="AC_WR_GetAttach_Asset" standardStylesheets="false" action="{!view}">
+ <html lang="ja">
+<apex:include pageName="vf_WR_Header1"/>
+<apex:includeScript value="{!URLFOR($Resource.WR_Res, 'WR_Res/js/jquery-1.11.0.min.js' )}"/>
+<apex:includeScript value="{!URLFOR($Resource.WR_Res, 'WR_Res/js/jquery-ui-1.9.2.custom.min.js')}"/>
+<apex:includeScript value="{!URLFOR($Resource.WR_Res, 'WR_Res/js/bootstrap.min.js')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.WR_Res, 'WR_Res/css/ui-lightness/jquery-ui-1.9.2.custom.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.WR_Res, 'WR_Res/css/bootstrap.min.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.WR_Res, 'WR_Res/css/custom.css')}"/>
+<script>
+    $j = jQuery.noConflict();
+</script>
+<style>
+.btn {
+    display: inline-block !important;
+    margin-bottom: 0 !important;
+    font-weight: 400 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    cursor: pointer !important;
+    background-image: none !important;
+    border: 1px solid transparent !important;
+    white-space: nowrap !important;
+    padding: 6px 12px !important;
+    font-size: 14px !important;
+    line-height: 1.42857143 !important;
+    border-radius: 4px !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    font-size: 93% !important;
+    font-weight: normal !important;
+    line-height: 1 !important;
+}
+
+.btn:hover, .btn:focus {
+    color: #333 !important;
+    text-decoration: none !important;
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active, .open .dropdown-toggle.btn-primary {
+    color: #fff !important;
+    background-color: #3276b1 !important;
+    border-color: #285e8e !important;
+}
+
+.btn-primary {
+    color: #fff !important;
+    background-color: #428bca !important;
+    border-color: #357ebd !important;
+}
+
+.modalth {
+    width: 20%;
+    height: 40px;
+    border-width: 1px 0px;
+    border-color: rgba(55, 68, 108, 0.09);
+    border-style: solid;
+    padding: 0.3em;
+}
+.modaltd {
+    width: 80%;
+    height: 40px;
+    border-width: 1px 0px;
+    border-color: rgba(55, 68, 108, 0.09);
+    border-style: solid;
+    padding: 0.3em;
+    display: table-cell;
+    vertical-align: middle;
+}
+.modaltd p{
+    display: table-cell;
+    vertical-align: middle;
+}
+.modal-header{
+    height: 50px;
+    border-bottom: 1px solid #428BCA;
+    background-color: rgba(243, 243, 243, 0.67);
+}
+.modal-body {
+    overflow:auto;
+}
+.modal-footer{
+    height: 50px;
+    margin-top: 0px;
+    padding-top: 10px;
+    border-top: 1px solid #428BCA;
+    background-color: rgba(243, 243, 243, 0.67);
+}
+.headbutton-active{
+    background: rgb(255, 255, 255);
+    border: 0.3px solid rgb(211, 227, 243);
+    border-radius: 5px;
+    width: 180px;
+    color: rgb(66, 139, 202);
+    font-weight: bold;
+    text-align: center;
+    display: inline;
+    padding: 3px 8px;
+}
+.headbutton-inactive{
+    background: rgb(66, 139, 202);
+    border: 0.3px solid rgb(211, 227, 243);
+    border-radius: 5px;
+    width: 180px;
+    color: rgb(211, 227, 243);
+    font-weight: bold;
+    text-align: center;
+}
+</style>
+<body>
+<div class="container">
+    <apex:include pageName="vf_WR_Header2"/>
+    <!-- ↓ナビゲーション -->
+    <ul class="nav nav-pills nav-justified">
+        <li><a href="{!URLFOR($Page.vf_WR_Top)}" title="サイトのトップページへ">ホーム</a></li>
+        <li class="active"><a href="{!URLFOR($Page.vf_WR_Down_Tool)}" title="修理・復旧、運用支援サービスの対応を表示">NJCからの報告書</a></li>
+        <li><a href="{!URLFOR($Page.vf_WR_FAQ_Page)}" title="サイトのＱ＆Ａ">よくある質問</a></li>
+        <li><a href="{!URLFOR($Page.vf_WR_Toiawase)}" title="Webからの簡単な問合せ（サービス提供時間外は翌営業日対応">お問い合わせ</a></li>
+    </ul>
+    <!-- ↑ナビゲーション -->
+    <!-- ↓コンテンツ -->
+    <div style="margin:10px 0px"></div>
+    <div class="row">
+        <div class="col-md-12">
+            <!-- 左のコンテンツ -->
+            <div class="panel panel-primary">
+
+                <div class="panel-heading">
+                <a href="{!URLFOR($Page.vf_WR_Down_Tool)}">
+                <div style=" display:inline; margin-left: 5px; font-size: 15px;" ><button type="" class="btn btn-default" style="color:#ffffff; background-color:#428bca;" title="修理・復旧サービスの対応を一覧表示"><b>　　修理・復旧サービス　　</b></button></div></a>
+                <a href="{!URLFOR($Page.vf_WR_Down_System)}">
+                <div id="systemRemote" style="{!Journal_RM }; margin-left: 5px; font-size: 15px;"><button type="" class="btn btn-default" style="color:#ffffff; background-color:#428bca;" title="運用支援サービスの対応を一覧表示"><b>　　運用支援サービス　　</b></button></div></a>
+                <div style=" display:inline; margin-left: 5px; font-size: 15px;"><button type="" class="btn btn-default" style="color:#428bca; background-color:#ffffff;" title="構築・導入サービスの報告を一覧表示中"><b>　　構築・導入サービス　　</b></button></div>
+                </div>
+
+                <div class="panel-body">
+                    <!-- ===== パンくずリスト ===== -->
+                    <p style="font-size: 1.0rem;"><a href="{!URLFOR($Page.vf_WR_Top)}">&nbsp; ホーム</a>&nbsp; &gt;&nbsp; NJCからの報告書&nbsp;&gt;&nbsp; 構築・導入サービス&nbsp; </p>
+
+                    <apex:form >
+                        <apex:outputPanel id="detail">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                        <th style="width:2%">#</th>
+                                        <th style="width:8%">受注№</th>
+                                        <th style="width:10%">完了日</th>
+                                        <th style="width:20%">設置場所</th>
+                                        <th style="width:30%">件名</th>
+                                        <!--<th style="width:15%">お客様担当者</th>-->
+                                        <th style="width:10%">作業担当者 </th>
+                                        <th style="width:20%">備考 </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <apex:repeat value="{!WRAtts}" var="dl" >
+                                            <tr onclick="window.open('{!dl.pdfUrl}','_blank');">
+                                                <td><apex:outputText value="{!dl.lineNo}"/></td>
+                                                <td><apex:outputText value="{!dl.OrderNo}"/></td>
+                                                <td><apex:outputText value="{!dl.WorkDateTo}"/></td>
+                                                <td><apex:outputText value="{!dl.NonyuNm }"/></td>
+                                                <td><apex:outputText value="{!dl.DelegeteProduct }"/></td>
+                                                <!--
+                                                <td>
+                                                    <div style="{!dl.dispPdf}">
+                                                    <button type="button" class="btn btn-primary" onclick='window.open("{!dl.pdfUrl}","_blank"); return false;'>表示</button>
+                                                    </div>
+                                                </td>
+                                                -->
+                                                <!--<td><apex:outputText value="{!dl.CustomerContactName}"/></td>-->
+                                                <td><apex:outputText value="{!dl.WorkerRf}"/></td>
+                                                <td><apex:outputText value="{!dl.Biko}"/></td>
+                                            </tr>
+                                        </apex:repeat>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </apex:outputPanel>
+                        <p class="text-center">
+                            <apex:commandLink action="{!first}"  value="［先頭］" />
+                            <apex:commandLink action="{!previous}"  value="［前ページ］" />
+                            <apex:outputText value="　{!page}　" />
+                            <apex:commandLink action="{!next}"  value="［次ページ］" />
+                            <apex:commandLink action="{!last}"  value="［最後］" />
+                        </p>
+                    </apex:form>
+                    <apex:relatedList list="CombinedAttachments" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ↑コンテンツ -->
+</div>
+<apex:include pageName="vf_WR_Footer"/>
+</body>
+</html>
+</apex:page>
+<!-- ↑Bootstrap -->
