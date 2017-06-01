@@ -1,0 +1,4 @@
+<apex:page >
+  <apex:sectionHeader title="報告書/対応票" />
+  <apex:ListViews type="SE_Callcenter__c" />
+</apex:page>

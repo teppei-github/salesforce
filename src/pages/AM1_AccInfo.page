@@ -1,0 +1,201 @@
+<apex:page standardController="Account" extensions="AM1_AccInfo_Ctrl" showHeader="false" standardStylesheets="false" sidebar="false" applyHtmlTag="false" applyBodyTag="false" docType="html-5.0" title="取引先詳細">
+<html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<apex:stylesheet value="{!URLFOR($Resource.SLDS0202, 'assets/styles/salesforce-lightning-design-system.min.css')}" />
+<!-- jQuery CDN -->
+<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script>
+
+    function openAccFeed(accid){
+        if((typeof sforce != 'undefined') && (sforce != null)) { 
+            sforce.one.navigateToURL('{!baseUrl}/apex/AM1_AccFeed?id=' + accid);
+        }
+        else {
+            location.href = '{!baseUrl}/apex/AM1_AccFeed?id=' + accid;
+        }
+    }    
+</script>
+<style>
+.card {
+  /*width: 350px;*/
+  width: 100%;
+  word-wrap: break-all;
+  
+  background: #fff;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px #ccc;
+  font-size:11pt;
+}
+.card-content {
+  /*padding: 20px;*/
+  margin: 20px;
+}
+.card-title {
+  font-size: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #333;
+}
+.card-text {
+  color: #777;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.card-link {
+  text-align: center;
+  border-top: 1px solid #eee;
+  /*padding: 20px;*/
+}
+.card-link a {
+  text-decoration: none;
+  color: #0bd;
+  margin: 0 10px;
+}
+.card-link a:hover {
+  color: #0090aa;
+}
+
+.slds-page-header__title {
+  font-size:11pt;
+}
+.slds-text-body--regular {
+  font-size:11pt;
+}
+
+.TitleAcc{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    -moz-text-overflow:ellipsis; 
+ }
+
+.FooterButton{
+    height: 35px;
+    margin-top: 15px;
+    vertical-align: middle;
+}
+
+.slds-docked-form-footer {
+    height: 65px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    left: 0;
+    background: #f4f6f9;
+    z-index: 8000;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-pack: center;
+    justify-content: center;
+}
+</style>
+
+<head>
+<title>取引先情報詳細</title>
+<!--<link rel="apple-touch-icon" href="{!baseUrl}{!URLFOR($Resource.AM1_Icon, 'icon/icon.png')}" />-->
+<link rel="apple-touch-icon" href="https://2.bp.blogspot.com/-T6UD79IbKMA/WP6sM4Y0AXI/AAAAAAAAAIk/7CqNj0LfV6UDLlKiX8oJsXQsQ1Abv1eFgCLcB/s1600/icon.jpg" />
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+
+<apex:form >
+<div class="slds" style="height:100%">
+  <apex:outputPanel id="formDetail">
+    <div class="slds-page-header" role="banner">    
+      <div class="slds-media">
+        <div class="slds-media__figure">
+          <svg aria-hidden="true" class="slds-icon slds-icon-standard-user slds-icon--container">
+            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS0202, 'assets/icons/standard-sprite/svg/symbols.svg#account')}"></use>
+          </svg>
+        </div>
+        <div class="slds-media__body">
+          <p class="slds-page-header__title slds-truncate"  style="font-size: 1.5em;">{!acc.Name}</p>
+          <p class="slds-text-body--regular">{!acc.CSTCD__c}</p>
+        </div>
+        </div>
+
+    </div>
+    
+    <section class="card">
+      <div class="slds">
+        <!-- 2017/04/17 add start -->
+        <!--<table class="slds-table slds-table--bordered slds-table--cell-buffer">-->
+        <table class="slds-table slds-table--bordered slds-table--fixed-layout slds-table--resizable-cols slds-no-cell-focus slds-cell-wrap slds-no-row-hover" style="margin-bottom: 80px;" role="grid">
+          <tbody>
+              <tr>
+                  <th scope="row">
+                  <p class="slds-text-body--regular">{!acc.ShippingPostalCode}</p>
+                  <p class="slds-text-body--regular">{!acc.ShippingState}{!acc.ShippingCity}{!acc.ShippingStreet}</p>
+                  <p class="slds-text-body--regular">電話：<a href="tel:{!acc.Phone}">{!acc.Phone}</a></p>          
+                  <p class="slds-text-body--regular slds-truncate">URL：<a href="{!acc.lbc_url__c}">{!acc.lbc_url__c}</a></p>
+                  <p class="slds-text-body--regular">ＰＵ：{!acc.PICSTFPU__c}</p>
+                  <p class="slds-text-body--regular">担当：{!acc.PICSTFID__r.Name}</p>
+                  <p class="slds-text-body--regular">種別：{!acc.CustomerType__c}</p>
+                </th>
+              </tr>
+              <tr>
+                <th scope="row">
+                  <div class="slds-truncate" ><apex:outputText value="業種1：{!acc.lbc_industry_name1__c}"/></div>
+                  <div class="slds-truncate" ><apex:outputText value="業種2：{!acc.lbc_industry_name2__c}"/></div>
+                  <div class="slds-truncate" ><apex:outputText value="業種3：{!acc.lbc_industry_name3__c}"/></div>
+                </th>
+              </tr>
+              <tr>
+                <!--<th scope="row" data-label="Opportunity Name">-->
+                <td class="slds-cell-wrap">
+                  <div class="slds-truncate" ><apex:outputText value="説明"/></div>
+                  <p class="slds-text-body--regular">{!acc.Description}</p>
+                </td>
+                <!--</th>-->
+              </tr>
+              <tr>
+                <th scope="row">              
+                  <div class="slds-truncate" ><apex:outputText value="{!acc.lbc_representative_title__c}"/></div>
+                  <div class="slds-truncate" ><apex:outputText value="{!acc.lbc_representative__c}"/></div>
+                </th>
+              </tr>
+              <tr style="background-color:#f7f9fb;">
+                <th scope="row">              
+                  <div class="slds-truncate">取引先責任者</div>
+                </th>
+              </tr>
+              <apex:repeat value="{!accCont}" var="dl" >
+                <tr>
+                  <th scope="row" data-label="Opportunity Name">
+                    <div class="slds-truncate" ><apex:outputText style="font-size: 1.2em;" value="{!dl.Name}"/></div>
+                    <div class="slds-truncate" ><apex:outputText value="カスタマーポータル権限：{! If(dl.NJCCustomerPortalUser__c,"有","無")}"/></div>
+                    <div class="slds-truncate" ><apex:outputText value="部署：{!dl.Department}"/></div>
+                    <div class="slds-truncate" ><apex:outputText value="役職：{!dl.Title}"/></div>
+                    <div class="slds-truncate" ><apex:outputText value="説明：{!dl.Description}"/></div>
+                  </th>
+                </tr>
+              </apex:repeat>
+          </tbody>
+        </table>
+        <!-- 2017/04/17 add end   -->
+    
+        <!-- フッタ -->
+        <div class="slds-docked-form-footer" >
+            <apex:commandButton styleClass="slds-button slds-button--neutral FooterButton" action="{!URLFOR($Page.AM1_AccSrcMain)}" value="取引先一覧"/>
+            <apex:outputText value="　" />
+            <!--<apex:commandButton styleClass="FooterButton" onclick="nomalAccountPage();" value="ｏｎｅ"/>-->
+            <a class="slds-button slds-button--neutral FooterButton" href="salesforce1://sObject/{!acc.id}/view">one</a>
+            <apex:outputText value="　" />
+            <a class="slds-button slds-button--neutral FooterButton" target="_brank" href="salesforce1://sObject/{!feedId}/view">フィード</a>
+            <!--<button Class="slds-button slds-button--neutral FooterButton" onclick="sforce.one.navigateToFeed('{!acc.id}','RECORD');return false;">フィード</button>-->
+        </div>
+      </div>
+    </section>
+  </apex:outputPanel>
+ 
+</div>
+</apex:form>
+<!-- s1にてスクロール時トップに戻る現象回避 START -->
+<script> 
+(function(){try{var a=navigator.userAgent; 
+    if((a.indexOf('Salesforce')!=-1)&&(a.indexOf('iPhone')!=-1||a.indexOf('iPad')!=-1)&&(a.indexOf('OS 10')!=-1)&&(a.indexOf('Safari')==-1)){ 
+        var s=document.createElement('style'); 
+        s.innerHTML="html,html body{overflow: auto;-webkit-overflow-scrolling:touch;}body{position:absolute;left:0;right:0;top:0;bottom:0;}"; 
+        document.getElementsByTagName('head')[0].appendChild(s);}}catch(e){}})(); 
+</script> 
+<!-- s1にてスクロール時トップに戻る現象回避 END   -->
+</html>
+</apex:page>
