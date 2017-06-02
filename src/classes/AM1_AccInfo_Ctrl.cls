@@ -5,6 +5,9 @@ public with sharing class AM1_AccInfo_Ctrl {
     public string baseUrl {get; set;}
     public string userId {get; set;}
     public string feedId {get; set;}
+    public string industyDisp1 {get; set;}
+    public string industyDisp2 {get; set;}
+    public string industyDisp3 {get; set;}
 
     // コンストラクタ
     public AM1_AccInfo_Ctrl (ApexPages.StandardController controller) {
@@ -40,7 +43,12 @@ public with sharing class AM1_AccInfo_Ctrl {
                                   from Account
                                  where id = :strId ];
         if(lstAcc.size() > 0) acc = lstAcc[0];
-        
+
+        // 業種の選択ボタン作成        
+        if(acc.lbc_industry_name1__c == null) industyDisp1 = 'display:none';
+        if(acc.lbc_industry_name2__c == null) industyDisp2 = 'display:none';
+        if(acc.lbc_industry_name3__c == null) industyDisp3 = 'display:none';
+
         // 取引先責任者情報
         List<Contact> lstAccCont = [Select Id
                                           ,AccountId
