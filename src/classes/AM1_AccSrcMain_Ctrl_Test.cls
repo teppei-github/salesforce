@@ -27,7 +27,7 @@ private class AM1_AccSrcMain_Ctrl_Test {
         }
         insert testAccList;
         
-        //新規取引先責任者
+        //新規取引先責任者 
         List<Contact> testContList = new List<Contact>();
         for (integer i = 0; i < 230; i ++){
             Contact testCont = new Contact(Email = 'test@test.co.jp',

@@ -114,7 +114,11 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         Set<String> setIndustry1 = new Set<String>();
         Set<String> setIndustry2 = new Set<String>();
         Set<String> setIndustry3 = new Set<String>();
-        List<AggregateResult> industlyAccList = [select lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c from Account group by lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c];
+        string strSOQL = 'select lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c';
+        strSOQL += ' from Account ';
+        strSOQL += ' where lbc_office_id__c != null ';
+        strSOQL += ' and (lbc_industry_name1__c != null or lbc_industry_name2__c != null or lbc_industry_name3__c != null)';
+        List<Account> industlyAccList = Database.query(strSOQL);
         for(AggregateResult acc : industlyAccList){
             if(acc.get('lbc_industry_name1__c') != null) setIndustry1.add(String.valueOf(acc.get('lbc_industry_name1__c')));
             if(acc.get('lbc_industry_name2__c') != null) setIndustry2.add(String.valueOf(acc.get('lbc_industry_name2__c')));
