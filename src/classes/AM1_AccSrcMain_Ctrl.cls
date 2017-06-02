@@ -14,7 +14,34 @@ public with sharing class AM1_AccSrcMain_Ctrl {
     public List<clsAcc> ALLAtts { get; set; }
     // 詳細表示画面用
     public List<clsAcc> dispAccs { get; set; }
-    
+    // 業種の制御
+    public string industryUpView1 {get; set;}
+    public string industryUpView2 {get; set;}
+    public string industryUpView3 {get; set;}
+    public string industryDownView1 {get; set;}
+    public string industryDownView2 {get; set;}
+    public string industryDownView3 {get; set;}
+    public Set<String> setIndustry1 {get; set;}
+    public Set<String> setIndustry2 {get; set;}
+    public Set<String> setIndustry3 {get; set;}
+    public string chooseIndustry1 {get; set;}
+    public string chooseIndustry2 {get; set;}
+    public string chooseIndustry3 {get; set;}
+    public string chooseVisibly1 {get; set;}
+    public string chooseVisibly2 {get; set;}
+    public string chooseVisibly3 {get; set;}
+
+    // 業種クラス
+    public class clsInds {
+        public integer index {get; set;}
+        public string industryName {get; set;}
+        public string industryUpView {get; set;}
+        public string industryDownView {get; set;}
+        public Set<String> setIndustry {get; set;}
+        public string chooseIndustry {get; set;}
+        public string chooseVisibly {get; set;}
+    }
+
     // 取引先クラス
     public class clsAcc {
         // 取引先id
@@ -60,6 +87,17 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         strMessage = '';
         ToastDisp = 'display:none';
         
+        // 業種の表示
+        industryUpView1 = '';
+        industryDownView1 = 'display:none';
+        industryUpView2 = '';
+        industryDownView2 = 'display:none';
+        industryUpView3 = '';
+        industryDownView3 = 'display:none';
+        chooseVisibly1 = 'display:none';
+        chooseVisibly2 = 'display:none';
+        chooseVisibly3 = 'display:none';
+
         baseUrl = URL.getSalesforceBaseUrl().toExternalForm();
         
         recAccMap = new Map<integer,clsAcc>();    
@@ -98,11 +136,101 @@ public with sharing class AM1_AccSrcMain_Ctrl {
             recAccMap.put(iCnt + 1,wkcAcc);
         }
         // teppei chg end
-                
+
+        // 業種で抽出
+        setIndustry1 = new Set<String>();
+        setIndustry2 = new Set<String>();
+        setIndustry3 = new Set<String>();
+        List<AggregateResult> industlyAccList = [select lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c from Account group by lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c];
+        for(AggregateResult acc : industlyAccList){
+            if(acc.get('lbc_industry_name1__c') != null) setIndustry1.add(String.valueOf(acc.get('lbc_industry_name1__c')));
+            if(acc.get('lbc_industry_name2__c') != null) setIndustry2.add(String.valueOf(acc.get('lbc_industry_name2__c')));
+            if(acc.get('lbc_industry_name3__c') != null) setIndustry3.add(String.valueOf(acc.get('lbc_industry_name3__c')));
+        }
+
         // 最近参照した取引先から表示
         SetRecentAcc();
     }
+
+    // 業種選択時の処理
+    public integer selectIndustly{ get; set; }
+    public void openIndustryList(){
+
+        if(selectIndustly == 1){
+            if(industryUpView1 == 'display:none'){
+                industryUpView1 = '';
+                industryDownView1 = 'display:none';
+            }
+            else{
+                industryUpView1 = 'display:none';
+                industryDownView1 = '';
+            }
+            industryUpView2 = '';
+            industryDownView2 = 'display:none';
+            industryUpView3 = '';
+            industryDownView3 = 'display:none';
+        }
+
+        if(selectIndustly == 2){
+            if(industryUpView2 == 'display:none'){
+                industryUpView2 = '';
+                industryDownView2 = 'display:none';
+            }
+            else{
+                industryUpView2 = 'display:none';
+                industryDownView2 = '';
+            }
+            industryUpView1 = '';
+            industryDownView1 = 'display:none';
+            industryUpView3 = '';
+            industryDownView3 = 'display:none';
+        }
+
+        if(selectIndustly == 3){            
+
+            if(industryUpView3 == 'display:none'){
+                industryUpView3 = '';
+                industryDownView3 = 'display:none';
+            }
+            else{
+                industryUpView3 = 'display:none';
+                industryDownView3 = '';
+            }
+
+            industryUpView1 = '';
+            industryDownView1 = 'display:none';
+            industryUpView2 = '';
+            industryDownView2 = 'display:none';
+        }
+    }
     
+
+    // 業種選択時の処理
+    public integer chooseItem{ get; set; }
+    public string chooseValue{ get; set; }
+    public void chooseIndustry(){
+        chooseVisibly1 =  'display:none';
+        chooseVisibly2 =  'display:none';
+        chooseVisibly3 =  'display:none';
+        chooseIndustry1 =  '';
+        chooseIndustry2 =  '';
+        chooseIndustry3 =  '';
+
+        if(chooseValue == '') return;
+        if(chooseItem == 1){
+            chooseVisibly1 =  '';
+            chooseIndustry1 = '× ' + chooseValue;
+        }
+        if(chooseItem == 2){
+            chooseVisibly2 =  '';
+            chooseIndustry2 = '× ' + chooseValue;
+        }
+        if(chooseItem == 3){
+            chooseVisibly3 =  '';
+            chooseIndustry3 = '× ' + chooseValue;
+        }
+    }
+
     // 取引先検索
     public string searchKey{ get; set; }
     public void SearchAcc(){

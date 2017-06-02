@@ -3,7 +3,7 @@ private class AC_WR_GetAttach_Asset_Test {
    // 
    static testMethod void myUnitTest1() {
  
-        // 新規取引C先
+        // 新規取引先
         Account testAcc = new Account(Name = 'Test Account');
         insert testAcc;
 
