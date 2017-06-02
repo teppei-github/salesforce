@@ -207,7 +207,7 @@ input:-moz-placeholder {
               </th>
             </tr>
             <tr onclick="SetSearchAccAF(); return false;">
-              <th scope="row" data-label="Opportunity Name">
+              <th scope="row">
                 <div class="slds-grid">
                   <div class="slds-col slds-has-flexi-truncate">
                     <div class="slds-media">
@@ -224,9 +224,13 @@ input:-moz-placeholder {
                 </div>
               </th>
             </tr>
+          </tbody>
+        </table>
+        <table class="slds-table slds-table--bordered">
+          <tbody>
             <apex:repeat value="{!dispInds}" var="Inds"> 
               <tr>
-                <th onclick="openIndustryListAF({!Inds.index}); return false;" scope="row" data-label="Opportunity Name">
+                <th onclick="openIndustryListAF({!Inds.index}); return false;" scope="row">
                   <div class="slds-grid">
                     <div class="slds-col slds-has-flexi-truncate">
                       <div class="slds-media">
@@ -243,15 +247,24 @@ input:-moz-placeholder {
                         <div class="slds-media__body">
                           <p class="text-center">業種{!Inds.index}</p>
                         </div>
-                        <div onclick="chooseIndustryAF({!Inds.index},'');return false;" style="cursor: default;{!Inds.chooseVisibly}" class="selectTag"><p>{!Inds.chooseIndustry}</p></div>
                       </div>
                     </div>
                   </div>
                 </th>
+                <th>
+                <div class="slds-grid">
+                    <div class="slds-col slds-has-flexi-truncate">
+                      <div class="slds-media">
+                            <div onclick="chooseIndustryAF({!Inds.index},'');return false;" style="cursor: default;{!Inds.chooseVisibly}" class="selectTag"><p>{!Inds.chooseIndustry}</p></div>
+                      </div>
+                    </div>
+                  </div>
+                    
+                </th>
               </tr> 
               <apex:repeat value="{!Inds.setIndustry}" var="setI"> 
-                <tr onclick="chooseIndustryAF(Inds.index,'{!setI}'); return false;" style="{!Inds.industryDownView}">
-                  <th scope="row" data-label="Opportunity Name">
+                <tr onclick="chooseIndustryAF({!Inds.index},'{!setI}'); return false;" style="cursor: default;{!Inds.industryDownView}">
+                  <th scope="row">
                     <div class="slds-grid">
                       <div class="slds-col slds-has-flexi-truncate">
                         <div class="slds-media">

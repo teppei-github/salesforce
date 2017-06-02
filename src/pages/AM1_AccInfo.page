@@ -116,7 +116,7 @@
     
     <section class="card">
       <div class="slds">
-        <!-- 2017/04/17 add start -->
+        <!-- 2017/04/17 add start  -->
         <!--<table class="slds-table slds-table--bordered slds-table--cell-buffer">-->
         <table class="slds-table slds-table--bordered slds-table--fixed-layout slds-table--resizable-cols slds-no-cell-focus slds-cell-wrap slds-no-row-hover" style="margin-bottom: 80px;" role="grid">
           <tbody>
@@ -133,9 +133,15 @@
               </tr>
               <tr>
                 <th scope="row">
-                  <div class="slds-truncate" ><apex:outputText value="業種1：{!acc.lbc_industry_name1__c}"/></div>
-                  <div class="slds-truncate" ><apex:outputText value="業種2：{!acc.lbc_industry_name2__c}"/></div>
-                  <div class="slds-truncate" ><apex:outputText value="業種3：{!acc.lbc_industry_name3__c}"/></div>
+                  <div class="slds-truncate" >業種1：
+                    <apex:commandButton style="{!industyDisp1}" styleClass="slds-button slds-button--neutral" action="{!URLFOR($Page.AM1_AccSrcMain)}?item=1&value={!acc.lbc_industry_name1__c}" value="{!acc.lbc_industry_name1__c}"/>
+                  </div>
+                  <div class="slds-truncate" >業種2：
+                    <apex:commandButton style="{!industyDisp2}" styleClass="slds-button slds-button--neutral" action="{!URLFOR($Page.AM1_AccSrcMain)}?item=2&value={!acc.lbc_industry_name2__c}" value="{!acc.lbc_industry_name2__c}"/>
+                  </div>
+                  <div class="slds-truncate" >業種3：
+                    <apex:commandButton style="{!industyDisp3}" styleClass="slds-button slds-button--neutral" action="{!URLFOR($Page.AM1_AccSrcMain)}?item=3&value={!acc.lbc_industry_name3__c}" value="{!acc.lbc_industry_name3__c}"/>
+                  </div>
                 </th>
               </tr>
               <tr>

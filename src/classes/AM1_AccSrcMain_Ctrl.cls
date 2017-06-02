@@ -72,10 +72,7 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         
         strMessage = '';
         ToastDisp = 'display:none';
-        
-
         baseUrl = URL.getSalesforceBaseUrl().toExternalForm();
-        
         recAccMap = new Map<integer,clsAcc>();    
         
         // teppei 最近参照した取引先はこのオブジェクトね
@@ -140,6 +137,15 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         }
         // 最近参照した取引先から表示
         SetRecentAcc();
+
+        // URLパラメータが設定されている場合、業種の抽出
+        String paramItem = ApexPages.CurrentPage().getParameters().get('item');
+        String paramValue = ApexPages.CurrentPage().getParameters().get('value');
+        if(paramItem != null && paramValue != null){
+            chooseItem = integer.valueOf(paramItem);
+            chooseValue = paramValue;
+            chooseIndustry();
+        }
     }
 
     // 業種選択時の処理
@@ -172,11 +178,71 @@ public with sharing class AM1_AccSrcMain_Ctrl {
             dispInds[i].chooseVisibly = 'display:none';
             dispInds[i].chooseIndustry = '';
 
-            if(chooseItem == dispInds[i].index && chooseValue != ''){
-                dispInds[i].chooseVisibly =  '';
-                dispInds[i].chooseIndustry = '× ' + chooseValue;
+            if(chooseItem == dispInds[i].index){
+                // 選択を解除
+                if( chooseValue == ''){
+                    dispInds[i].industryUpView = '';
+                    dispInds[i].industryDownView = 'display:none';
+                    // 最近参照した取引先から表示
+                    SetRecentAcc();
+                }
+                else{
+                    dispInds[i].chooseVisibly =  '';
+                    dispInds[i].chooseIndustry = '× ' + chooseValue;
+                    // 業種で取引先を抽出
+                    SetIndustryAcc();
+                }
             }
         }
+    }
+
+    public void SetIndustryAcc(){
+
+        strMessage = '';
+        ToastDisp = 'display:none';
+
+        if(chooseItem == 0) return;
+        if(chooseValue == '') return;
+        
+        // 取引先取得
+        string strSOQL = '';
+        strSOQL += 'Select Id, Name, PICSTFPU__c, PICSTFID__r.Name,';
+        strSOQL += 'lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c';
+        strSOQL += ' from Account where ';
+        if(chooseItem == 1) strSOQL += ' lbc_industry_name1__c ';
+        if(chooseItem == 2) strSOQL += ' lbc_industry_name2__c ';
+        if(chooseItem == 3) strSOQL += ' lbc_industry_name3__c ';
+        strSOQL += ' = \'' + chooseValue + '\'';
+        strSOQL += ' limit 101';
+
+        List<Account> lstAcc = Database.query(strSOQL);
+        
+        if (lstAcc.Size() == 0){
+            strMessage = '検索結果が見つかりません。';
+            ToastDisp = '';
+            return;
+        }
+        
+        if (lstAcc.Size() >= 100){
+            strMessage = '100件以上の結果があります。';
+            ToastDisp = '';
+        }
+        
+        srcAccMap = new Map<integer,clsAcc>();  
+        for(integer iCnt = 0; iCnt < lstAcc.Size(); iCnt ++){
+            clsAcc wkcAcc = new clsAcc();
+            wkcAcc.lineNo = iCnt + 1;
+            wkcAcc.TorihikisakiId = lstAcc[iCnt].id;
+            wkcAcc.TorihikisakiNm = lstAcc[iCnt].Name;
+            wkcAcc.EigyotantouPU = lstAcc[iCnt].PICSTFPU__c;
+            wkcAcc.EigyotantouNm = lstAcc[iCnt].PICSTFID__r.Name;
+            wkcAcc.Gyousyu1 = lstAcc[iCnt].lbc_industry_name1__c;
+            wkcAcc.Gyousyu2 = lstAcc[iCnt].lbc_industry_name2__c;
+            wkcAcc.Gyousyu3 = lstAcc[iCnt].lbc_industry_name3__c;
+            srcAccMap.put(iCnt + 1,wkcAcc);
+        }
+        // 検索結果の取引先から表示
+        SetSearchAcc();
     }
 
     // 取引先検索
