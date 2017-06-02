@@ -57,6 +57,18 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         public string chooseIndustry {get; set;}
         public string chooseVisibly {get; set;}
     }
+    // 選択された業種
+    public string SelectIndustry1 {get; set;}
+    public string SelectIndustry2 {get; set;}
+    public string SelectIndustry3 {get; set;}
+    // 業種セット１，２，３
+    Set<String> setIndustry1 = new Set<String>();
+    Set<String> setIndustry2 = new Set<String>();
+    Set<String> setIndustry3 = new Set<String>();
+    // 業種マップ１(業種1 - 業種2)
+    Map<String,Set<String>> MapGyousyu1 = new Map<String,Set<String>>();
+    // 業種マップ２(業種2 - 業種3)
+    Map<String,Set<String>> MapGyousyu2 = new Map<String,Set<String>>();
 
     // ページ情報
     public String page { get; set; }
@@ -111,18 +123,40 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         // teppei chg end
 
         // 業種で抽出
-        Set<String> setIndustry1 = new Set<String>();
-        Set<String> setIndustry2 = new Set<String>();
-        Set<String> setIndustry3 = new Set<String>();
+        SelectIndustry1 = '';
+        SelectIndustry2 = '';
+        SelectIndustry3 = '';
+        setIndustry1 = new Set<String>();
+        setIndustry2 = new Set<String>();
+        setIndustry3 = new Set<String>();
+        MapGyousyu1 = new Map<String,Set<String>>();
+        MapGyousyu2 = new Map<String,Set<String>>();
         string strSOQL = 'select lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c';
         strSOQL += ' from Account ';
         strSOQL += ' where lbc_office_id__c != null ';
         strSOQL += ' and (lbc_industry_name1__c != null or lbc_industry_name2__c != null or lbc_industry_name3__c != null)';
+        strSOQL += ' Limit 50000 ';
         List<Account> industlyAccList = Database.query(strSOQL);
-        for(AggregateResult acc : industlyAccList){
-            if(acc.get('lbc_industry_name1__c') != null) setIndustry1.add(String.valueOf(acc.get('lbc_industry_name1__c')));
-            if(acc.get('lbc_industry_name2__c') != null) setIndustry2.add(String.valueOf(acc.get('lbc_industry_name2__c')));
-            if(acc.get('lbc_industry_name3__c') != null) setIndustry3.add(String.valueOf(acc.get('lbc_industry_name3__c')));
+        for(Account acc : industlyAccList){
+            string wkGyoshu1 = acc.lbc_industry_name1__c;
+            string wkGyoshu2 = acc.lbc_industry_name2__c;
+            string wkGyoshu3 = acc.lbc_industry_name3__c;
+            if(wkGyoshu1 != null) setIndustry1.add(wkGyoshu1);
+            if(wkGyoshu2 != null) setIndustry2.add(wkGyoshu2);
+            if(wkGyoshu3 != null) setIndustry3.add(wkGyoshu3);
+
+            if(wkGyoshu1 != null){
+                Set<string> setGyoshu2 = new Set<string>();
+                if(MapGyousyu1.containsKey(wkGyoshu1)) setGyoshu2 = MapGyousyu1.get(wkGyoshu1);
+                setGyoshu2.add(wkGyoshu2);
+                MapGyousyu1.put(wkGyoshu1,setGyoshu2);
+            } 
+            if(wkGyoshu2 != null){
+                Set<string> setGyoshu3 = new Set<string>();
+                if(MapGyousyu2.containsKey(wkGyoshu2)) setGyoshu3 = MapGyousyu2.get(wkGyoshu2);
+                setGyoshu3.add(wkGyoshu3);
+                MapGyousyu2.put(wkGyoshu2,setGyoshu3);
+            } 
         }
 
         // 業種初期化
@@ -178,25 +212,93 @@ public with sharing class AM1_AccSrcMain_Ctrl {
     public integer chooseItem{ get; set; }
     public string chooseValue{ get; set; }
     public void chooseIndustry(){
-        for(integer i = 0; i < 3; i++){
-            dispInds[i].chooseVisibly = 'display:none';
-            dispInds[i].chooseIndustry = '';
+        if(chooseValue == null) chooseValue = '';
+        dispInds[0].industryUpView = '';
+        dispInds[0].industryDownView = 'display:none';
+        dispInds[1].industryUpView = '';
+        dispInds[1].industryDownView = 'display:none';
+        dispInds[2].industryUpView = '';
+        dispInds[2].industryDownView = 'display:none';
 
-            if(chooseItem == dispInds[i].index){
-                // 選択を解除
-                if( chooseValue == ''){
-                    dispInds[i].industryUpView = '';
-                    dispInds[i].industryDownView = 'display:none';
-                    // 最近参照した取引先から表示
-                    SetRecentAcc();
+        // 業種１を選択した場合　→２と３の選択はクリア　２のセットをmapから取得、３のセットはsetから取得
+        // 業種１を解除した場合　→２と３の選択はクリア　２のセットをsetから取得、３のセットはsetから取得
+        if(chooseItem == 1){
+            SelectIndustry1 = chooseValue;
+            SelectIndustry2 = '';
+            SelectIndustry3 = '';
+            dispInds[1].chooseVisibly =  'display:none';
+            dispInds[1].chooseIndustry = '';
+            dispInds[2].chooseVisibly =  'display:none';
+            dispInds[2].chooseIndustry = '';
+            if(chooseValue == '') {
+                dispInds[0].chooseVisibly = 'display:none';
+                dispInds[0].chooseIndustry = '';
+                dispInds[1].setIndustry = setIndustry2;
+                dispInds[2].setIndustry = setIndustry3;
+            }
+            else {
+                dispInds[0].chooseVisibly =  '';
+                dispInds[0].chooseIndustry = '× ' + chooseValue;
+                dispInds[1].setIndustry = MapGyousyu1.get(chooseValue);
+                Set<String> wkInd3 = new Set<String>();
+                if(MapGyousyu1.containsKey(SelectIndustry1)){
+                    for(string str2 : MapGyousyu1.get(SelectIndustry1)){
+                        if(MapGyousyu2.containsKey(str2)) wkInd3.addAll(MapGyousyu2.get(str2));
+                    }
+                }
+                dispInds[2].setIndustry = wkInd3;
+            }
+        }
+
+        // 業種２を選択した場合　→３の選択はクリア　３のセットはmapから取得
+        // 業種２を解除した場合　→３の選択はクリア　３のセットはsetから取得
+        if(chooseItem == 2){
+            SelectIndustry2 = chooseValue;
+            SelectIndustry3 = '';
+            dispInds[2].chooseVisibly =  'display:none';
+            dispInds[2].chooseIndustry = '';
+            if(chooseValue == '') {
+                dispInds[1].chooseVisibly =  'display:none';
+                dispInds[1].chooseIndustry = '';
+                if(SelectIndustry1 == ''){
+                    dispInds[2].setIndustry = setIndustry3;
                 }
                 else{
-                    dispInds[i].chooseVisibly =  '';
-                    dispInds[i].chooseIndustry = '× ' + chooseValue;
-                    // 業種で取引先を抽出
-                    SetIndustryAcc();
+                    Set<String> wkInd3 = new Set<String>();
+                    if(MapGyousyu1.containsKey(SelectIndustry1)){
+                        for(string str2 : MapGyousyu1.get(SelectIndustry1)){
+                            if(MapGyousyu2.containsKey(str2)) wkInd3.addAll(MapGyousyu2.get(str2));
+                        }
+                    }
+                    dispInds[2].setIndustry = wkInd3;
                 }
             }
+            else{
+                dispInds[1].chooseVisibly =  '';
+                dispInds[1].chooseIndustry = '× ' + chooseValue;
+                dispInds[2].setIndustry = MapGyousyu2.get(chooseValue);
+            }
+        }
+        
+        // 業種３を選択した場合　そのまま
+        if(chooseItem == 3){
+            SelectIndustry3 = chooseValue;
+            if(chooseValue == '') {
+                dispInds[2].chooseVisibly =  'display:none';
+                dispInds[2].chooseIndustry = '';
+            }
+            else{
+                dispInds[2].chooseVisibly =  '';
+                dispInds[2].chooseIndustry = '× ' + chooseValue;
+            }
+        }
+
+        // すべて解除されたら、 最近参照した取引先から表示
+        if(SelectIndustry1 == '' && SelectIndustry2 == '' && SelectIndustry3 == ''){
+            SetRecentAcc();
+        }
+        else{
+            SetIndustryAcc();
         }
     }
 
@@ -206,17 +308,22 @@ public with sharing class AM1_AccSrcMain_Ctrl {
         ToastDisp = 'display:none';
 
         if(chooseItem == 0) return;
-        if(chooseValue == '') return;
+        //if(chooseValue == '') return;
         
         // 取引先取得
         string strSOQL = '';
         strSOQL += 'Select Id, Name, PICSTFPU__c, PICSTFID__r.Name,';
         strSOQL += 'lbc_industry_name1__c,lbc_industry_name2__c,lbc_industry_name3__c';
-        strSOQL += ' from Account where ';
-        if(chooseItem == 1) strSOQL += ' lbc_industry_name1__c ';
-        if(chooseItem == 2) strSOQL += ' lbc_industry_name2__c ';
-        if(chooseItem == 3) strSOQL += ' lbc_industry_name3__c ';
-        strSOQL += ' = \'' + chooseValue + '\'';
+        strSOQL += ' from Account where lbc_office_id__c != null ';
+        if(SelectIndustry1 != ''){
+            strSOQL += ' and lbc_industry_name1__c = \'' + SelectIndustry1 + '\'';
+        } 
+        if(SelectIndustry2 != ''){
+            strSOQL += ' and lbc_industry_name2__c = \'' + SelectIndustry2 + '\'';
+        } 
+        if(SelectIndustry3 != ''){
+            strSOQL += ' and lbc_industry_name3__c = \'' + SelectIndustry3 + '\'';
+        } 
         strSOQL += ' limit 101';
 
         List<Account> lstAcc = Database.query(strSOQL);

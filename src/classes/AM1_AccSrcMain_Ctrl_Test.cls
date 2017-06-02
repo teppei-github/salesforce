@@ -11,6 +11,7 @@ private class AM1_AccSrcMain_Ctrl_Test {
             ,lbc_industry_name1__c = '業種1-' + i
             ,lbc_industry_name2__c = '業種2-' + i
             ,lbc_industry_name3__c = '業種3-' + i
+            ,lbc_office_id__c = '1000' + i
             );
 
             testAccList.add(testAcc);
@@ -22,6 +23,7 @@ private class AM1_AccSrcMain_Ctrl_Test {
             ,lbc_industry_name1__c = '業種1'
             ,lbc_industry_name2__c = '業種2'
             ,lbc_industry_name3__c = '業種3'
+            ,lbc_office_id__c = '2000' + i
             );
             testAccList.add(testAcc);
         }
@@ -95,6 +97,16 @@ private class AM1_AccSrcMain_Ctrl_Test {
         te1.chooseItem = 3;
         te1.chooseValue = '業種3';
         te1.chooseIndustry();
+        te1.chooseItem = 3;
+        te1.chooseValue = '';
+        te1.chooseIndustry();
+        te1.chooseItem = 2;
+        te1.chooseValue = '';
+        te1.chooseIndustry();
+        te1.chooseItem = 1;
+        te1.chooseValue = '';
+        te1.chooseIndustry();
+        te1.chooseItem = 2;
         te1.chooseValue = '';
         te1.chooseIndustry();
         te1.chooseValue = 'xxxxx';
