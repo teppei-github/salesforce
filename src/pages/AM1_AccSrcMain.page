@@ -1,4 +1,4 @@
-<apex:page standardController="Account" extensions="AM1_AccSrcMain_Ctrl" showHeader="false" standardStylesheets="false" sidebar="false" applyHtmlTag="false" applyBodyTag="false" docType="html-5.0">
+<apex:page standardController="Account" extensions="AM1_AccSrcMain_Ctrl" showHeader="false" readonly="True" standardStylesheets="false" sidebar="false" applyHtmlTag="false" applyBodyTag="false" docType="html-5.0">
 <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <apex:stylesheet value="{!URLFOR($Resource.SLDS0202, 'assets/styles/salesforce-lightning-design-system.min.css')}" />
 <apex:includeScript value="https://cdnjs.cloudflare.com/ajax/libs/svg4everybody/2.0.3/svg4everybody.js"/>
@@ -15,8 +15,6 @@
             }
         });
     });
-    
-    
     
     function onClickSearchActs(){
         var searchKey = j$('[id$=searchInput]').val();
@@ -245,7 +243,7 @@ input:-moz-placeholder {
                           </svg>
                         </div>
                         <div class="slds-media__body">
-                          <p class="text-center">業種{!Inds.index}</p>
+                          <p class="text-center">{!Inds.industryName}</p>
                         </div>
                       </div>
                     </div>

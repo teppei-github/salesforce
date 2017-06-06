@@ -8,9 +8,9 @@ private class AM1_AccSrcMain_Ctrl_Test {
         List<Account> testAccList = new List<Account>();
         for (integer i = 0; i < 30; i ++){
             Account testAcc = new Account(Name = 'Test Account'
-            ,lbc_industry_name1__c = '業種1-' + i
-            ,lbc_industry_name2__c = '業種2-' + i
-            ,lbc_industry_name3__c = '業種3-' + i
+            ,lbc_industry_name1__c = '【業種】1-' + i
+            ,lbc_industry_name2__c = '【業種】2-' + i
+            ,lbc_industry_name3__c = '【業種】3-' + i
             ,lbc_office_id__c = '1000' + i
             );
 
@@ -20,9 +20,9 @@ private class AM1_AccSrcMain_Ctrl_Test {
         // 新規取引先(100件以上作成)
         for (integer i = 0; i < 200; i ++){
             Account testAcc = new Account(Name = 'Poison Adrena'
-            ,lbc_industry_name1__c = '業種1'
-            ,lbc_industry_name2__c = '業種2'
-            ,lbc_industry_name3__c = '業種3'
+            ,lbc_industry_name1__c = '【業種】1'
+            ,lbc_industry_name2__c = '【業種】2'
+            ,lbc_industry_name3__c = '【業種】3'
             ,lbc_office_id__c = '2000' + i
             );
             testAccList.add(testAcc);
@@ -48,7 +48,7 @@ private class AM1_AccSrcMain_Ctrl_Test {
         PageReference pageRef = Page.AM1_AccSrcMain;
         
         pageRef.getParameters().put('item', '1');
-        pageRef.getParameters().put('value', '業種');
+        pageRef.getParameters().put('value', '【業種】1');
         // 「AM1_AccSrcMain」のカレントページ化
         Test.setCurrentPage(pageRef);
 
@@ -88,14 +88,17 @@ private class AM1_AccSrcMain_Ctrl_Test {
         te1.openIndustryList();
         te1.openIndustryList();
 
+        te1.chooseItem = 0;
+        te1.chooseValue = '【業種】';
+        te1.chooseIndustry();
         te1.chooseItem = 1;
-        te1.chooseValue = '業種1';
+        te1.chooseValue = '【業種】1';
         te1.chooseIndustry();
         te1.chooseItem = 2;
-        te1.chooseValue = '業種2';
+        te1.chooseValue = '【業種】2';
         te1.chooseIndustry();
         te1.chooseItem = 3;
-        te1.chooseValue = '業種3';
+        te1.chooseValue = '【業種】3';
         te1.chooseIndustry();
         te1.chooseItem = 3;
         te1.chooseValue = '';
@@ -104,6 +107,9 @@ private class AM1_AccSrcMain_Ctrl_Test {
         te1.chooseValue = '';
         te1.chooseIndustry();
         te1.chooseItem = 1;
+        te1.chooseValue = '';
+        te1.chooseIndustry();
+        te1.chooseItem = 0;
         te1.chooseValue = '';
         te1.chooseIndustry();
         te1.chooseItem = 2;
